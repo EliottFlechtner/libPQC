@@ -338,6 +338,42 @@ class TestQuotientPolynomial(unittest.TestCase):
         self.assertGreaterEqual(norm, 0)
         self.assertLessEqual(norm, 68)  # Max symmetric value for Z_137
 
+    def test_is_small_basic(self):
+        """Test is_small for basic polynomials."""
+        # Polynomial with inf_norm = 2
+        p = QuotientPolynomial([1, 2, 3], self.Z5, degree=4)
+        # inf_norm is max(1, 2, 2) = 2
+        self.assertTrue(p.is_small(2))
+        self.assertTrue(p.is_small(3))
+        self.assertFalse(p.is_small(1))
+
+    def test_is_small_zero_polynomial(self):
+        """Test is_small for zero polynomial."""
+        p = QuotientPolynomial([0], self.Z5, degree=4)
+        self.assertTrue(p.is_small(0))
+        self.assertTrue(p.is_small(1))
+
+    def test_is_small_boundary(self):
+        """Test is_small at boundary values."""
+        Z137 = IntegersRing(137)
+        # Create polynomial with inf_norm = 54
+        p = QuotientPolynomial([93, 51, 34, 54], Z137, degree=4)
+        self.assertTrue(p.is_small(54))  # Exactly at boundary
+        self.assertTrue(p.is_small(55))  # Above boundary
+        self.assertFalse(p.is_small(53))  # Below boundary
+
+    def test_is_small_large_eta(self):
+        """Test is_small with large eta values."""
+        p = QuotientPolynomial([1, 2], self.Z5, degree=4)
+        self.assertTrue(p.is_small(100))
+        self.assertTrue(p.is_small(10))
+
+    def test_is_small_negative_eta_raises(self):
+        """Test that negative eta raises ValueError."""
+        p = QuotientPolynomial([1, 2], self.Z5, degree=4)
+        with self.assertRaises(ValueError):
+            p.is_small(-1)
+
 
 class TestQuotientPolynomialRing(unittest.TestCase):
     """Test cases for QuotientPolynomialRing class."""

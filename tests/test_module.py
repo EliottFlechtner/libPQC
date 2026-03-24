@@ -190,6 +190,58 @@ class TestModule(unittest.TestCase):
         self.assertGreaterEqual(norm_scaled, 0)
         self.assertLess(norm_scaled, 5)  # Should be in Z_5
 
+    def test_is_small_zero_vector(self):
+        """Test is_small for zero vector."""
+        z = self.M2.zero()
+        self.assertTrue(z.is_small(0))
+        self.assertTrue(z.is_small(1))
+
+    def test_is_small_basic_vector(self):
+        """Test is_small for basic vectors."""
+        v = self.M2.element([[1, 2], [3, 4]])
+        # inf_norm is max(2, 2) = 2
+        self.assertTrue(v.is_small(2))
+        self.assertTrue(v.is_small(3))
+        self.assertFalse(v.is_small(1))
+
+    def test_is_small_boundary(self):
+        """Test is_small at boundary values."""
+        Z137 = IntegersRing(137)
+        R137 = QuotientPolynomialRing(Z137, degree=4)
+        M3 = Module(R137, rank=3)
+
+        # Vector with specific inf_norm
+        v = M3.element([[93, 51, 34, 54], [27, 87, 81, 6], [112, 15, 46, 122]])
+        # inf_norm = 56 (max of entry norms)
+        self.assertTrue(v.is_small(56))  # Exactly at boundary
+        self.assertTrue(v.is_small(57))  # Above boundary
+        self.assertFalse(v.is_small(55))  # Below boundary
+
+    def test_is_small_large_eta(self):
+        """Test is_small with large eta values."""
+        v = self.M2.element([[1, 2], [3]])
+        self.assertTrue(v.is_small(100))
+        self.assertTrue(v.is_small(10))
+
+    def test_is_small_negative_eta_raises(self):
+        """Test that negative eta raises ValueError."""
+        v = self.M2.element([[1, 2], [3]])
+        with self.assertRaises(ValueError):
+            v.is_small(-1)
+
+    def test_is_small_after_operations(self):
+        """Test is_small after vector operations."""
+        v = self.M2.element([[1, 2], [3]])
+        w = self.M2.element([[4], [1, 1]])
+
+        # Test that small vectors work
+        self.assertTrue(v.is_small(2))
+        self.assertTrue(w.is_small(1))
+
+        # Test sum
+        s = v + w
+        self.assertTrue(s.is_small(s.inf_norm()))  # Should always be True
+
 
 if __name__ == "__main__":
     unittest.main()
