@@ -166,6 +166,22 @@ class ModuleElement:
             return self.inner_product(other)
         return self.scalar_mul(other)
 
+    def inf_norm(self):
+        """Compute the infinite norm of the vector (maximum infinity norm of entries).
+
+        The infinity norm of a module element is the maximum infinity norm among all
+        its component polynomials. This is useful for measuring the "size" of a lattice
+        vector in lattice-based cryptography.
+
+        Returns:
+            int: The maximum infinity norm of all entries (non-negative).
+
+        Example:
+            For vector (93 + 51x + 34x^2 + 54x^3, 27 + 87x + 81x^2 + 6x^3, ...):
+            inf_norm = max(93, 87, 122) = 122
+        """
+        return max(entry.inf_norm() for entry in self.entries)
+
 
 class Module:
     """Factory and manager for the free module R_q^k over a quotient polynomial ring.

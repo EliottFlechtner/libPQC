@@ -18,6 +18,8 @@ Example:
     >>> qp = qring.polynomial([1, 2, 3])  # quotient polynomial with automatic reduction
 """
 
+from src.integers import IntegersRing
+
 
 class Polynomial:
     """A polynomial with coefficients in a modular integer ring Z_q.
@@ -157,67 +159,6 @@ class Polynomial:
                     new_coefficients[i + j], self.ring.mul(coeff1, coeff2)
                 )
         return Polynomial(new_coefficients, self.ring)
-
-
-class IntegersRing:
-    """The ring Z_q of integers modulo q.
-
-    Provides basic arithmetic operations (addition, subtraction, multiplication, negation)
-    in Z_q, where all results are automatically reduced modulo q. Used as the
-    coefficient ring for polynomials and quotient polynomials.
-    """
-
-    def __init__(self, modulus):
-        """Initialize the ring Z_q.
-
-        Args:
-            modulus (int): The modulus q defining Z_q. Must be positive.
-        """
-        self.modulus = modulus
-
-    def add(self, a, b):
-        """Add two ring elements: (a + b) mod q.
-
-        Args:
-            a, b (int): Elements of Z_q.
-
-        Returns:
-            int: The sum (a + b) mod q.
-        """
-        return (a + b) % self.modulus
-
-    def sub(self, a, b):
-        """Subtract two ring elements: (a - b) mod q.
-
-        Args:
-            a, b (int): Elements of Z_q.
-
-        Returns:
-            int: The difference (a - b) mod q.
-        """
-        return (a - b) % self.modulus
-
-    def mul(self, a, b):
-        """Multiply two ring elements: (a * b) mod q.
-
-        Args:
-            a, b (int): Elements of Z_q.
-
-        Returns:
-            int: The product (a * b) mod q.
-        """
-        return (a * b) % self.modulus
-
-    def neg(self, a):
-        """Negate a ring element: (-a) mod q.
-
-        Args:
-            a (int): Element of Z_q.
-
-        Returns:
-            int: The negation (-a) mod q.
-        """
-        return (-a) % self.modulus
 
 
 class PolynomialRing:
@@ -461,6 +402,24 @@ class QuotientPolynomial:
 
         # Then reduce modulo X^n + 1
         return QuotientPolynomial(new_coefficients, self.ring, self.degree)
+
+    def inf_norm(self):
+        """Compute the infinite norm of the polynomial using symmetric representatives.
+
+        The infinite norm is the maximum absolute value of the coefficients when
+        represented as symmetric elements of Z_q (i.e., in [-q/2, q/2]).
+
+        Returns:
+            int: The maximum infinity norm of all coefficients (non-negative).
+
+        Example:
+            For 93 + 51x + 34x^2 + 54x^3 in Z_137[X]:
+            All coefficients are already small, so inf_norm = 93
+
+            For 135 + 136x in Z_137[X]:
+            135 ≡ -2 (mod 137), 136 ≡ -1 (mod 137), so inf_norm = max(2, 1) = 2
+        """
+        return max(self.ring.inf_norm(coeff) for coeff in self.coefficients)
 
 
 class QuotientPolynomialRing:
