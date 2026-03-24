@@ -103,7 +103,7 @@ class TestPolynomial(unittest.TestCase):
         p2 = Polynomial([1], self.Z5)
         self.assertEqual(str(p2), "1")
         p3 = Polynomial([0, 1], self.Z5)
-        self.assertEqual(str(p3), "1x")
+        self.assertEqual(str(p3), "x")
 
     def test_call_evaluate(self):
         """Test polynomial evaluation."""
