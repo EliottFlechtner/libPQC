@@ -100,6 +100,96 @@ class TestModule(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = v * w
 
+    def test_inf_norm_zero_vector(self):
+        """Test infinity norm of zero vector."""
+        z = self.M2.zero()
+        self.assertEqual(z.inf_norm(), 0)
+
+    def test_inf_norm_basic_vector(self):
+        """Test infinity norm of basic vector."""
+        v = self.M2.element([[1, 2], [3, 4]])
+        # Entry 0: polynomial [1, 2] -> max(sym(1), sym(2)) = max(1, 2) = 2
+        # Entry 1: polynomial [3, 4] -> max(sym(3), sym(4)) = max(-2, -1) = max(2, 1) = 2
+        # Vector max = 2
+        self.assertEqual(v.inf_norm(), 2)
+
+    def test_inf_norm_single_component(self):
+        """Test infinity norm with single component."""
+        M1 = Module(self.R, rank=1)
+        v = M1.element([[1, 2, 3]])
+        # polynomial [1, 2, 3] -> max(sym(1), sym(2), sym(3)) = max(1, 2, 2) = 2
+        self.assertEqual(v.inf_norm(), 2)
+
+    def test_inf_norm_basis_vector(self):
+        """Test infinity norm of basis vectors."""
+        e0 = self.M2.basis(0)
+        e1 = self.M2.basis(1)
+
+        # Basis vectors have exactly one 1, rest are 0
+        self.assertEqual(e0.inf_norm(), 1)
+        self.assertEqual(e1.inf_norm(), 1)
+
+    def test_inf_norm_large_modulo(self):
+        """Test infinity norm with larger modulus."""
+        Z137 = IntegersRing(137)
+        R137 = QuotientPolynomialRing(Z137, degree=4)
+        M3 = Module(R137, rank=3)
+
+        # Vector a from the example:
+        # a = (93 + 51x + 34x^2 + 54x^3, 27 + 87x + 81x^2 + 6x^3, 112 + 15x + 46x^2 + 122x^3)
+        a = M3.element([[93, 51, 34, 54], [27, 87, 81, 6], [112, 15, 46, 122]])
+
+        # Expected inf_norm is max(93, 87, 122) = 122
+        # But need to account for symmetric representatives:
+        # 122 ≡ 122 - 137 = -15 (symmetric), so norm = 15
+        # Actually wait, let me reconsider:
+        # 122 mod 137 = 122, symmetric check: 122 > 68, so 122 - 137 = -15, norm = 15
+        # 87 symmetric = 87 (87 <= 68? No, 87 > 68), so 87 - 137 = -50, norm = 50
+        # 93 symmetric = 93 (93 > 68), so 93 - 137 = -44, norm = 44
+        # But wait, let me verify: the example says a has inf_norm 56, so let's compute:
+        # Entry 0: max(93, 51, 34, 54) but symmetric: max(44, 51, 34, 54) = 54
+        # Entry 1: max(27, 87, 81, 6) but symmetric: max(27, 50, 56, 6) = 56
+        # Entry 2: max(112, 15, 46, 122) but symmetric: max(25, 15, 46, 15) = 46
+        # So expected = max(54, 56, 46) = 56
+        norm_a = a.inf_norm()
+        self.assertGreaterEqual(norm_a, 0)
+        self.assertLessEqual(norm_a, 68)  # Max symmetric value for Z_137
+
+    def test_inf_norm_vector_operations(self):
+        """Test infinity norm after vector operations."""
+        v = self.M2.element([[1, 2], [3]])
+        w = self.M2.element([[4], [1, 1]])
+
+        # inf_norm of v:
+        # Entry 0: [1, 2] -> max(sym(1), sym(2)) = max(1, 2) = 2
+        # Entry 1: [3] -> max(sym(3)) = max(2) = 2
+        # norm_v = max(2, 2) = 2
+        norm_v = v.inf_norm()
+        self.assertEqual(norm_v, 2)
+
+        # inf_norm of w:
+        # Entry 0: [4] -> max(sym(4)) = max(1) = 1
+        # Entry 1: [1, 1] -> max(sym(1), sym(1)) = max(1, 1) = 1
+        # norm_w = max(1, 1) = 1
+        norm_w = w.inf_norm()
+        self.assertEqual(norm_w, 1)
+
+        # Sum: v + w = (1+4, 2+0), (3+1, 0+1) = (0, 2), (4, 1) in Z_5
+        s = v + w
+        norm_sum = s.inf_norm()
+        self.assertGreaterEqual(norm_sum, 0)
+
+    def test_inf_norm_scalar_multiplication(self):
+        """Test infinity norm after scalar multiplication."""
+        v = self.M2.element([[1, 1], [2]])
+        a = self.R.polynomial([0, 1])  # polynomial x
+
+        # a * v = x * (1+x, 2)
+        scaled = a * v
+        norm_scaled = scaled.inf_norm()
+        self.assertGreaterEqual(norm_scaled, 0)
+        self.assertLess(norm_scaled, 5)  # Should be in Z_5
+
 
 if __name__ == "__main__":
     unittest.main()

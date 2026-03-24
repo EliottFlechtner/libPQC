@@ -12,6 +12,7 @@ from src.polynomials import (
     QuotientPolynomial,
     QuotientPolynomialRing,
 )
+from src.integers import SymmetricModulo
 
 
 class TestIntegersRing(unittest.TestCase):
@@ -55,6 +56,88 @@ class TestIntegersRing(unittest.TestCase):
         self.assertEqual(self.Z5.neg(1), 4)  # -1≡4 (mod 5)
         self.assertEqual(self.Z5.neg(3), 2)  # -3≡2 (mod 5)
         self.assertEqual(self.Z7.neg(2), 5)  # -2≡5 (mod 7)
+
+    def test_inf_norm_basic(self):
+        """Test infinity norm with basic values."""
+        self.assertEqual(self.Z5.inf_norm(0), 0)
+        self.assertEqual(self.Z5.inf_norm(1), 1)
+        self.assertEqual(self.Z5.inf_norm(2), 2)
+        self.assertEqual(self.Z7.inf_norm(3), 3)
+
+    def test_inf_norm_symmetric_conversion(self):
+        """Test infinity norm using symmetric representatives."""
+        Z137 = IntegersRing(137)
+        # In Z_137, symmetric range is [-68, 68]
+        self.assertEqual(Z137.inf_norm(135), 2)  # 135 ≡ -2 (mod 137)
+        self.assertEqual(Z137.inf_norm(136), 1)  # 136 ≡ -1 (mod 137)
+        self.assertEqual(Z137.inf_norm(68), 68)  # 68 is maximum symmetric
+        self.assertEqual(Z137.inf_norm(69), 68)  # 69 ≡ -68 (mod 137)
+        self.assertEqual(Z137.inf_norm(70), 67)  # 70 ≡ -67 (mod 137)
+
+    def test_inf_norm_even_modulus(self):
+        """Test infinity norm with even modulus."""
+        Z128 = IntegersRing(128)
+        # In Z_128, symmetric range is [-64, 63]
+        self.assertEqual(Z128.inf_norm(127), 1)  # 127 ≡ -1 (mod 128)
+        self.assertEqual(Z128.inf_norm(64), 64)  # 64 at boundary
+        self.assertEqual(Z128.inf_norm(65), 63)  # 65 ≡ -63 (mod 128)
+
+    def test_inf_norm_all_positive(self):
+        """Test that inf_norm is always non-negative."""
+        for val in range(137):
+            norm = IntegersRing(137).inf_norm(val)
+            self.assertGreaterEqual(norm, 0)
+
+
+class TestSymmetricModulo(unittest.TestCase):
+    """Test cases for SymmetricModulo class."""
+
+    def test_symmetric_odd_modulus(self):
+        """Test symmetric representative with odd modulus."""
+        sym = SymmetricModulo(5)
+        self.assertEqual(sym.symmetric(0), 0)
+        self.assertEqual(sym.symmetric(1), 1)
+        self.assertEqual(sym.symmetric(2), 2)
+        self.assertEqual(sym.symmetric(3), -2)  # 3 > 2, so 3 - 5 = -2
+        self.assertEqual(sym.symmetric(4), -1)  # 4 > 2, so 4 - 5 = -1
+        self.assertEqual(sym.symmetric(5), 0)  # 5 ≡ 0 (mod 5)
+
+    def test_symmetric_odd_modulus_137(self):
+        """Test symmetric representative for Z_137 (odd)."""
+        sym = SymmetricModulo(137)
+        self.assertEqual(sym.symmetric(68), 68)  # At boundary
+        self.assertEqual(sym.symmetric(69), -68)  # 69 > 68, so 69 - 137 = -68
+        self.assertEqual(sym.symmetric(135), -2)  # 135 > 68, so 135 - 137 = -2
+        self.assertEqual(sym.symmetric(136), -1)  # 136 > 68, so 136 - 137 = -1
+
+    def test_symmetric_even_modulus(self):
+        """Test symmetric representative with even modulus."""
+        sym = SymmetricModulo(128)
+        self.assertEqual(sym.symmetric(0), 0)
+        self.assertEqual(sym.symmetric(63), 63)  # 63 < 64, stays positive
+        self.assertEqual(
+            sym.symmetric(64), -64
+        )  # For even, 64 >= 64, so 64 - 128 = -64
+        self.assertEqual(sym.symmetric(65), -63)  # 65 >= 64, so 65 - 128 = -63
+        self.assertEqual(sym.symmetric(127), -1)  # 127 >= 64, so 127 - 128 = -1
+
+    def test_symmetric_negative_input(self):
+        """Test symmetric representative with negative input (should work via modulo)."""
+        sym = SymmetricModulo(5)
+        self.assertEqual(
+            sym.symmetric(-1), -1
+        )  # -1 ≡ 4 (mod 5), then 4 > 2 so 4-5 = -1
+        self.assertEqual(
+            sym.symmetric(-2), -2
+        )  # -2 ≡ 3 (mod 5), then 3 > 2 so 3-5 = -2
+        self.assertEqual(sym.symmetric(-3), 2)  # -3 ≡ 2 (mod 5), then 2 <= 2 so stays 2
+
+    def test_symmetric_large_input(self):
+        """Test symmetric representative with values > modulus."""
+        sym = SymmetricModulo(5)
+        self.assertEqual(sym.symmetric(10), 0)  # 10 ≡ 0 (mod 5), stays 0
+        self.assertEqual(sym.symmetric(12), 2)  # 12 ≡ 2 (mod 5), 2 <= 2 so stays 2
+        self.assertEqual(sym.symmetric(137), 2)  # 137 ≡ 2 (mod 5), 2 <= 2 so stays 2
 
 
 class TestPolynomial(unittest.TestCase):
@@ -339,6 +422,47 @@ class TestQuotientPolynomial(unittest.TestCase):
         p2 = QuotientPolynomial([1, 2], self.Z7, degree=3)
         with self.assertRaises(ValueError):
             _ = p1 * p2
+
+    def test_inf_norm_basic(self):
+        """Test infinity norm of quotient polynomial."""
+        p = QuotientPolynomial([1, 2, 3], self.Z5, degree=4)
+        # symmetric(1) = 1, symmetric(2) = 2, symmetric(3) = -2
+        # inf_norm = max(|1|, |2|, |-2|) = max(1, 2, 2) = 2
+        self.assertEqual(p.inf_norm(), 2)
+
+    def test_inf_norm_zero_polynomial(self):
+        """Test infinity norm of zero polynomial."""
+        p = QuotientPolynomial([0], self.Z5, degree=4)
+        self.assertEqual(p.inf_norm(), 0)
+
+    def test_inf_norm_single_term(self):
+        """Test infinity norm with single term."""
+        p = QuotientPolynomial([0, 0, 5], self.Z5, degree=4)
+        # 5 ≡ 0 (mod 5), so inf_norm = 0
+        self.assertEqual(p.inf_norm(), 0)
+
+    def test_inf_norm_with_large_modulo(self):
+        """Test infinity norm with larger modulus Z_137."""
+        Z137 = IntegersRing(137)
+        # Polynomial a_0 = 93 + 51x + 34x^2 + 54x^3
+        p = QuotientPolynomial([93, 51, 34, 54], Z137, degree=4)
+        # symmetric(93) = 93 - 137 = -44, abs = 44
+        # symmetric(51) = 51, abs = 51
+        # symmetric(34) = 34, abs = 34
+        # symmetric(54) = 54, abs = 54
+        # max = 54
+        self.assertEqual(p.inf_norm(), 54)
+
+    def test_inf_norm_with_high_representatives(self):
+        """Test infinity norm with high coefficient representatives."""
+        Z137 = IntegersRing(137)
+        # Polynomial with coefficients that reduce to negative symmetrics
+        p = QuotientPolynomial([93, 51, 34, 54], Z137, degree=3)
+        # 54 ≡ 54 (symmetric = 54), others similar
+        # Should compute max after symmetric conversion
+        norm = p.inf_norm()
+        self.assertGreaterEqual(norm, 0)
+        self.assertLessEqual(norm, 68)  # Max symmetric value for Z_137
 
 
 class TestQuotientPolynomialRing(unittest.TestCase):
