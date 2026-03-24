@@ -266,34 +266,34 @@ class QuotientPolynomialRing:
         return QuotientPolynomial([1], self.coefficient_ring, self.degree)
 
 
-if __name__ == "__main__":
-    # Example 1: Regular polynomial ring Z_5[X]
-    print("=== Regular Polynomial Ring Z_5[X] ===")
-    Z5 = IntegersRing(5)
-    PolyZ5 = PolynomialRing(Z5)
+# if __name__ == "__main__":
+#     # Example 1: Regular polynomial ring Z_5[X]
+#     print("=== Regular Polynomial Ring Z_5[X] ===")
+#     Z5 = IntegersRing(5)
+#     PolyZ5 = PolynomialRing(Z5)
 
-    p1 = PolyZ5.polynomial([1, 2, 3])  # Represents 3x^2 + 2x + 1 in Z5
-    p2 = PolyZ5.polynomial([4, 0, 1])  # Represents x^2 + 4 in Z5
+#     p1 = PolyZ5.polynomial([1, 2, 3])  # Represents 3x^2 + 2x + 1 in Z5
+#     p2 = PolyZ5.polynomial([4, 0, 1])  # Represents x^2 + 4 in Z5
 
-    print("p1:", p1)
-    print("p2:", p2)
-    print("p1 + p2:", p1 + p2)
-    print("p1 * p2:", p1 * p2)
+#     print("p1:", p1)
+#     print("p2:", p2)
+#     print("p1 + p2:", p1 + p2)
+#     print("p1 * p2:", p1 * p2)
 
-    # Example 2: Quotient polynomial ring Z_5[X] / (X^3 + 1)
-    print("\n=== Quotient Polynomial Ring Z_5[X] / (X^3 + 1) ===")
-    quotient_ring = QuotientPolynomialRing(Z5, degree=3)
+#     # Example 2: Quotient polynomial ring Z_5[X] / (X^3 + 1)
+#     print("\n=== Quotient Polynomial Ring Z_5[X] / (X^3 + 1) ===")
+#     quotient_ring = QuotientPolynomialRing(Z5, degree=3)
 
-    q1 = quotient_ring.polynomial([1, 2, 3])  # 3x^2 + 2x + 1
-    q2 = quotient_ring.polynomial([4, 0, 1])  # x^2 + 4
+#     q1 = quotient_ring.polynomial([1, 2, 3])  # 3x^2 + 2x + 1
+#     q2 = quotient_ring.polynomial([4, 0, 1])  # x^2 + 4
 
-    print("q1:", q1)
-    print("q2:", q2)
-    print("q1 + q2:", q1 + q2)
-    print("q1 * q2:", q1 * q2)
+#     print("q1:", q1)
+#     print("q2:", q2)
+#     print("q1 + q2:", q1 + q2)
+#     print("q1 * q2:", q1 * q2)
 
-    # Degree reduction test: x^2 * x^2 = x^4 = -x (since x^3 = -1)
-    print("\n=== Degree Reduction Test ===")
-    x2 = quotient_ring.polynomial([0, 0, 1])  # x^2
-    prod_x4 = x2 * x2  # x^4 should reduce to -x
-    print("x^2 * x^2 (should be -x = 4x in Z_5):", prod_x4)
+#     # Degree reduction test: x^2 * x^2 = x^4 = -x (since x^3 = -1)
+#     print("\n=== Degree Reduction Test ===")
+#     x2 = quotient_ring.polynomial([0, 0, 1])  # x^2
+#     prod_x4 = x2 * x2  # x^4 should reduce to -x
+#     print("x^2 * x^2 (should be -x = 4x in Z_5):", prod_x4)
