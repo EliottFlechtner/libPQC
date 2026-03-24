@@ -421,6 +421,33 @@ class QuotientPolynomial:
         """
         return max(self.ring.inf_norm(coeff) for coeff in self.coefficients)
 
+    def is_small(self, eta):
+        """Check if this polynomial belongs to S_eta = {p : inf_norm(p) <= eta}.
+
+        This is useful in lattice-based cryptography for checking if a polynomial
+        is sufficiently small for various security properties and operations.
+
+        Args:
+            eta (int): The bound parameter. Must be non-negative.
+
+        Returns:
+            bool: True if inf_norm(self) <= eta, False otherwise.
+
+        Raises:
+            ValueError: If eta is negative.
+
+        Example:
+            >>> ring = QuotientPolynomialRing(IntegersRing(137), degree=4)
+            >>> p = ring([93, 51, 34, 54])
+            >>> p.is_small(93)  # inf_norm = 54 <= 93
+            True
+            >>> p.is_small(50)  # inf_norm = 54 > 50
+            False
+        """
+        if eta < 0:
+            raise ValueError("eta must be non-negative")
+        return self.inf_norm() <= eta
+
 
 class QuotientPolynomialRing:
     """Factory and operations wrapper for the quotient polynomial ring Z_q[X]/(X^n+1).

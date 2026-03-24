@@ -182,6 +182,33 @@ class ModuleElement:
         """
         return max(entry.inf_norm() for entry in self.entries)
 
+    def is_small(self, eta):
+        """Check if this vector belongs to S_eta^k = {v : inf_norm(v) <= eta}.
+
+        This is useful in lattice-based cryptography for checking if a vector
+        is sufficiently small for various security properties and operations.
+
+        Args:
+            eta (int): The bound parameter. Must be non-negative.
+
+        Returns:
+            bool: True if inf_norm(self) <= eta, False otherwise.
+
+        Raises:
+            ValueError: If eta is negative.
+
+        Example:
+            >>> M = Module(QuotientPolynomialRing(Z137, 4), rank=3)
+            >>> v = M.element([[93, 51, 34, 54], [27, 87, 81, 6], [112, 15, 46, 122]])
+            >>> v.is_small(56)  # inf_norm = 56 <= 56
+            True
+            >>> v.is_small(50)  # inf_norm = 56 > 50
+            False
+        """
+        if eta < 0:
+            raise ValueError("eta must be non-negative")
+        return self.inf_norm() <= eta
+
 
 class Module:
     """Factory and manager for the free module R_q^k over a quotient polynomial ring.
