@@ -139,18 +139,7 @@ class TestModule(unittest.TestCase):
         # a = (93 + 51x + 34x^2 + 54x^3, 27 + 87x + 81x^2 + 6x^3, 112 + 15x + 46x^2 + 122x^3)
         a = M3.element([[93, 51, 34, 54], [27, 87, 81, 6], [112, 15, 46, 122]])
 
-        # Expected inf_norm is max(93, 87, 122) = 122
-        # But need to account for symmetric representatives:
-        # 122 ≡ 122 - 137 = -15 (symmetric), so norm = 15
-        # Actually wait, let me reconsider:
-        # 122 mod 137 = 122, symmetric check: 122 > 68, so 122 - 137 = -15, norm = 15
-        # 87 symmetric = 87 (87 <= 68? No, 87 > 68), so 87 - 137 = -50, norm = 50
-        # 93 symmetric = 93 (93 > 68), so 93 - 137 = -44, norm = 44
-        # But wait, let me verify: the example says a has inf_norm 56, so let's compute:
-        # Entry 0: max(93, 51, 34, 54) but symmetric: max(44, 51, 34, 54) = 54
-        # Entry 1: max(27, 87, 81, 6) but symmetric: max(27, 50, 56, 6) = 56
-        # Entry 2: max(112, 15, 46, 122) but symmetric: max(25, 15, 46, 15) = 46
-        # So expected = max(54, 56, 46) = 56
+        # TODO
         norm_a = a.inf_norm()
         self.assertGreaterEqual(norm_a, 0)
         self.assertLessEqual(norm_a, 68)  # Max symmetric value for Z_137
