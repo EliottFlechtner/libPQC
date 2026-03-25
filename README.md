@@ -1,7 +1,7 @@
 # libPQC
 
-[![CI](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml)
+[![CI](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml/badge.svg?branch=dev)](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml)
 [![Release](https://github.com/EliottFlechtner/libPQC/actions/workflows/release.yml/badge.svg)](https://github.com/EliottFlechtner/libPQC/actions/workflows/release.yml)
 
 Lattice-based post-quantum cryptography playground with a communication-simulation-oriented architecture.
