@@ -1,5 +1,9 @@
 # libPQC
 
+[![CI](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml)
+[![Release](https://github.com/EliottFlechtner/libPQC/actions/workflows/release.yml/badge.svg)](https://github.com/EliottFlechtner/libPQC/actions/workflows/release.yml)
+
 Lattice-based post-quantum cryptography playground with a communication-simulation-oriented architecture.
 
 ## Architecture
@@ -52,3 +56,28 @@ from src.core.module import Module
 - Only structure/scaffolding has been added for communication simulation and orchestration.
 - Core algebraic functionality and tests are preserved.
 - This keeps feature development under your control while providing a stable layout.
+
+## CI/CD
+
+The repository includes three GitHub Actions workflows:
+
+- `CI`: tests on push/PR, nightly run, manual run, coverage artifacts.
+- `CodeQL`: static security analysis on `main` and `dev`, plus weekly scan.
+- `Release`: runs tests and publishes a GitHub release from tags matching `v*` (or manual dispatch).
+
+### Release usage
+
+- Tag-based release:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+- Manual release: run `Release` workflow from Actions tab and provide `tag`.
+
+### Branch protection
+
+Recommended branch protection settings are documented in:
+
+- `.github/BRANCH_PROTECTION.md`
