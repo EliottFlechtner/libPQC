@@ -1,7 +1,7 @@
 import unittest
 
-from src.libpqc.core.module import Module, ModuleElement
-from src.libpqc.core.polynomials import (
+from src.core.module import Module, ModuleElement
+from src.core.polynomials import (
     IntegersRing,
     QuotientPolynomial,
     QuotientPolynomialRing,

@@ -5,7 +5,7 @@ from pathlib import Path
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from src.libpqc.core.integers import SymmetricModulo, IntegersRing
+from src.core.integers import SymmetricModulo, IntegersRing
 
 
 class TestIntegersRing(unittest.TestCase):

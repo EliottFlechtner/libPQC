@@ -6,9 +6,9 @@ including matrix operations, norm computations, and small set membership.
 """
 
 import unittest
-from src.libpqc.core.integers import IntegersRing
-from src.libpqc.core.polynomials import QuotientPolynomialRing
-from src.libpqc.core.module import Module
+from src.core.integers import IntegersRing
+from src.core.polynomials import QuotientPolynomialRing
+from src.core.module import Module
 
 
 class TestMLWEExample(unittest.TestCase):
