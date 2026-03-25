@@ -134,7 +134,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add coverage
+          # Force-add because repository/global ignore rules and coverage.py's
+          # generated coverage/html/.gitignore can otherwise block report files.
+          git add -A -f coverage
           if git diff --cached --quiet; then
             echo "No coverage changes to commit"
             exit 0
