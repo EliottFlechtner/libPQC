@@ -1,0 +1,1 @@
+"""Communication simulation package scaffold."""
