@@ -52,12 +52,17 @@ jobs:
       - name: Export coverage XML
         run: coverage xml
 
+      - name: Export coverage HTML
+        run: coverage html -d htmlcov
+
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-py${{ matrix.python-version }}
-          path: coverage.xml
+          path: |
+            coverage.xml
+            htmlcov
 
   smoke:
     name: Smoke (entrypoint)
@@ -90,3 +95,47 @@ jobs:
 
       - name: Dependency Review
         uses: actions/dependency-review-action@v4
+
+  publish-coverage:
+    name: Publish Coverage Report
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/dev'
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install coverage
+
+      - name: Generate coverage files
+        run: |
+          coverage run -m unittest discover -s tests -p 'test_*.py'
+          coverage html -d public/coverage/html
+          coverage xml -o public/coverage/coverage.xml
+          coverage json -o public/coverage/coverage.json
+
+      - name: Build badge endpoint JSON
+        run: |
+          python -c "import json; from pathlib import Path; cj=Path('public/coverage/coverage.json'); bj=Path('public/coverage/badge.json'); ih=Path('public/coverage/index.html'); pct=round(float(json.loads(cj.read_text())['totals']['percent_covered']),2); color='brightgreen' if pct>=95 else 'green' if pct>=90 else 'yellowgreen' if pct>=80 else 'yellow' if pct>=70 else 'red'; bj.write_text(json.dumps({'schemaVersion':1,'label':'coverage','message':f'{pct}%','color':color})); ih.write_text('<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\" />\n    <meta http-equiv=\"refresh\" content=\"0; url=./html/index.html\" />\n    <title>Coverage Report</title>\n  </head>\n  <body>\n    <p>Coverage report: <a href=\"./html/index.html\">open</a></p>\n  </body>\n</html>\n')"
+
+      - name: Ensure Pages static serving
+        run: touch public/.nojekyll
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./public
