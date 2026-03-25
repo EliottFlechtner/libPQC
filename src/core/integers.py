@@ -18,8 +18,21 @@ class SymmetricModulo:
         Args:
             modulus (int): The modulus q. Must be positive.
         """
+        if not isinstance(modulus, int):
+            raise TypeError("modulus must be an integer")
+        if modulus <= 0:
+            raise ValueError("modulus must be positive")
+
         self.modulus = modulus
         self.half_modulus = modulus // 2
+
+    def __repr__(self):
+        return f"SymmetricModulo(modulus={self.modulus})"
+
+    def __eq__(self, other):
+        if not isinstance(other, SymmetricModulo):
+            return NotImplemented
+        return self.modulus == other.modulus
 
     def symmetric(self, a):
         """Convert an integer to its symmetric representative in Z_q.
@@ -30,6 +43,9 @@ class SymmetricModulo:
         Returns:
             int: The symmetric representative in Z_q.
         """
+        if not isinstance(a, int):
+            raise TypeError("a must be an integer")
+
         a_mod = a % self.modulus
         # For odd modulus: range is [-floor(q/2), floor(q/2)], use >
         # For even modulus: range is [-q/2, q/2-1], use >=
@@ -56,8 +72,21 @@ class IntegersRing:
         Args:
             modulus (int): The modulus q defining Z_q. Must be positive.
         """
+        if not isinstance(modulus, int):
+            raise TypeError("modulus must be an integer")
+        if modulus <= 0:
+            raise ValueError("modulus must be positive")
+
         self.modulus = modulus
         self.symmetric_mod = SymmetricModulo(modulus)
+
+    def __repr__(self):
+        return f"IntegersRing(modulus={self.modulus})"
+
+    def __eq__(self, other):
+        if not isinstance(other, IntegersRing):
+            return NotImplemented
+        return self.modulus == other.modulus
 
     def add(self, a, b):
         """Add two ring elements: (a + b) mod q.

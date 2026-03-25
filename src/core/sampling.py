@@ -8,12 +8,22 @@ import random
 import secrets
 from typing import Optional
 
+from .module import Module, ModuleElement
 from .polynomials import QuotientPolynomial, QuotientPolynomialRing
 
 
 def _resolve_rng(rng: Optional[random.Random]) -> random.Random:
     """Return a caller-provided RNG or a secure default RNG."""
     return rng if rng is not None else secrets.SystemRandom()
+
+
+def make_deterministic_rng(seed: int | str | bytes) -> random.Random:
+    """Build a deterministic RNG from a user-provided seed."""
+    if isinstance(seed, bytes):
+        seed_value = int.from_bytes(seed, byteorder="big", signed=False)
+    else:
+        seed_value = seed
+    return random.Random(seed_value)
 
 
 def sample_uniform_coefficients(
@@ -103,3 +113,71 @@ def sample_small_polynomial(
         raise ValueError("method must be either 'cbd' or 'uniform'")
 
     return quotient_ring.polynomial(coeffs)
+
+
+def sample_uniform_vector(
+    module: Module, rng: Optional[random.Random] = None
+) -> ModuleElement:
+    """Sample a module element with uniformly random polynomial entries."""
+    if not isinstance(module, Module):
+        raise TypeError("module must be a Module")
+
+    entries = [
+        sample_uniform_polynomial(module.quotient_ring, rng=rng)
+        for _ in range(module.rank)
+    ]
+    return module.element(entries)
+
+
+def sample_small_vector(
+    module: Module,
+    eta: int,
+    method: str = "cbd",
+    rng: Optional[random.Random] = None,
+) -> ModuleElement:
+    """Sample a module element with small polynomial entries."""
+    if not isinstance(module, Module):
+        raise TypeError("module must be a Module")
+
+    entries = [
+        sample_small_polynomial(module.quotient_ring, eta=eta, method=method, rng=rng)
+        for _ in range(module.rank)
+    ]
+    return module.element(entries)
+
+
+def sample_uniform_matrix(
+    quotient_ring: QuotientPolynomialRing,
+    rows: int,
+    cols: int,
+    rng: Optional[random.Random] = None,
+) -> list[list[QuotientPolynomial]]:
+    """Sample a rows x cols matrix over a quotient ring with uniform entries."""
+    if rows < 0 or cols < 0:
+        raise ValueError("rows and cols must be non-negative")
+
+    return [
+        [sample_uniform_polynomial(quotient_ring, rng=rng) for _ in range(cols)]
+        for _ in range(rows)
+    ]
+
+
+def sample_small_matrix(
+    quotient_ring: QuotientPolynomialRing,
+    rows: int,
+    cols: int,
+    eta: int,
+    method: str = "cbd",
+    rng: Optional[random.Random] = None,
+) -> list[list[QuotientPolynomial]]:
+    """Sample a rows x cols matrix over a quotient ring with small entries."""
+    if rows < 0 or cols < 0:
+        raise ValueError("rows and cols must be non-negative")
+
+    return [
+        [
+            sample_small_polynomial(quotient_ring, eta=eta, method=method, rng=rng)
+            for _ in range(cols)
+        ]
+        for _ in range(rows)
+    ]

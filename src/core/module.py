@@ -41,6 +41,11 @@ class ModuleElement:
         Raises:
             ValueError: If the number of entries doesn't match the module rank.
         """
+        if not isinstance(module, Module):
+            raise TypeError("module must be a Module")
+        if entries is None:
+            raise TypeError("entries must not be None")
+
         self.module = module
         if len(entries) != module.rank:
             raise ValueError(
@@ -48,6 +53,22 @@ class ModuleElement:
             )
 
         self.entries = [module._coerce_entry(entry) for entry in entries]
+
+    def __repr__(self):
+        return f"ModuleElement(rank={self.module.rank}, entries={self.entries})"
+
+    def __eq__(self, other):
+        if not isinstance(other, ModuleElement):
+            return NotImplemented
+        if self.module is not other.module:
+            return False
+        return self.entries == other.entries
+
+    def is_zero(self):
+        return all(entry.is_zero() for entry in self.entries)
+
+    def copy(self):
+        return ModuleElement(self.module, [entry.copy() for entry in self.entries])
 
     def __str__(self):
         """Return a human-readable string representation of the vector.
@@ -70,6 +91,8 @@ class ModuleElement:
         Raises:
             ValueError: If the vectors belong to different modules.
         """
+        if not isinstance(other, ModuleElement):
+            return NotImplemented
         if self.module is not other.module:
             raise ValueError("Module elements must belong to the same module")
         new_entries = [a + b for a, b in zip(self.entries, other.entries)]
@@ -87,6 +110,8 @@ class ModuleElement:
         Raises:
             ValueError: If the vectors belong to different modules.
         """
+        if not isinstance(other, ModuleElement):
+            return NotImplemented
         if self.module is not other.module:
             raise ValueError("Module elements must belong to the same module")
         new_entries = [a - b for a, b in zip(self.entries, other.entries)]
@@ -127,6 +152,8 @@ class ModuleElement:
         Example:
             If self = (p1, p2) and other = (q1, q2), returns p1*q1 + p2*q2 in R_q.
         """
+        if not isinstance(other, ModuleElement):
+            raise TypeError("other must be a ModuleElement")
         if self.module is not other.module:
             raise ValueError("Module elements must belong to the same module")
 
@@ -231,10 +258,20 @@ class Module:
         """
         if not isinstance(quotient_ring, QuotientPolynomialRing):
             raise TypeError("quotient_ring must be a QuotientPolynomialRing")
+        if not isinstance(rank, int):
+            raise TypeError("rank must be an integer")
         if rank <= 0:
             raise ValueError("Module rank must be a positive integer")
         self.quotient_ring = quotient_ring
         self.rank = rank
+
+    def __repr__(self):
+        return (
+            "Module("
+            f"modulus={self.quotient_ring.coefficient_ring.modulus}, "
+            f"degree={self.quotient_ring.degree}, rank={self.rank}"
+            ")"
+        )
 
     def _coerce_entry(self, entry):
         """Convert an entry to a QuotientPolynomial with ring compatibility checks.

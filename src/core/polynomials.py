@@ -38,12 +38,48 @@ class Polynomial:
                                  Leading zeros are automatically removed.
             ring (IntegersRing): Defines the modulus q for Z_q coefficient reduction.
         """
+        if not isinstance(ring, IntegersRing):
+            raise TypeError("ring must be an IntegersRing")
+        if coefficients is None:
+            raise TypeError("coefficients must not be None")
+
         self.ring = ring
         # Reduce all coefficients modulo the ring's modulus
-        self.coefficients = [coeff % ring.modulus for coeff in coefficients]
+        self.coefficients = [int(coeff) % ring.modulus for coeff in coefficients]
+        if not self.coefficients:
+            self.coefficients = [0]
         # Remove leading zeros
         while len(self.coefficients) > 1 and self.coefficients[-1] == 0:
             self.coefficients.pop()
+
+    def __repr__(self):
+        return (
+            f"Polynomial(coefficients={self.coefficients}, modulus={self.ring.modulus})"
+        )
+
+    def __eq__(self, other):
+        if not isinstance(other, Polynomial):
+            return NotImplemented
+        return (
+            self.ring.modulus == other.ring.modulus
+            and self.coefficients == other.coefficients
+        )
+
+    def is_zero(self):
+        return all(c == 0 for c in self.coefficients)
+
+    def copy(self):
+        return Polynomial(list(self.coefficients), self.ring)
+
+    def to_coefficients(self, length=None):
+        coeffs = list(self.coefficients)
+        if length is None:
+            return coeffs
+        if length < 0:
+            raise ValueError("length must be non-negative")
+        if len(coeffs) >= length:
+            return coeffs[:length]
+        return coeffs + [0] * (length - len(coeffs))
 
     def __call__(self, x):
         """Evaluate the polynomial at a given value.
@@ -74,17 +110,17 @@ class Polynomial:
                 if power == 0:
                     terms.append(f"{coeff}")
                 else:
-                    str = ""
+                    term = ""
                     if power == 1:
                         if coeff != 1:
-                            str += f"{coeff}"
-                        str += "x"
-                        terms.append(str)
+                            term += f"{coeff}"
+                        term += "x"
+                        terms.append(term)
                     else:
                         if coeff != 1:
-                            str += f"{coeff}"
-                        str += f"x^{power}"
-                        terms.append(str)
+                            term += f"{coeff}"
+                        term += f"x^{power}"
+                        terms.append(term)
         return " + ".join(terms[::-1]) or "0"
 
     def __add__(self, other):
@@ -99,6 +135,8 @@ class Polynomial:
         Raises:
             ValueError: If polynomials are in different rings.
         """
+        if not isinstance(other, Polynomial):
+            return NotImplemented
         if self.ring.modulus != other.ring.modulus:
             raise ValueError("Polynomials must be in the same ring")
 
@@ -122,6 +160,8 @@ class Polynomial:
         Raises:
             ValueError: If polynomials are in different rings.
         """
+        if not isinstance(other, Polynomial):
+            return NotImplemented
         if self.ring.modulus != other.ring.modulus:
             raise ValueError("Polynomials must be in the same ring")
 
@@ -240,10 +280,51 @@ class QuotientPolynomial:
             ring: An IntegersRing object defining the coefficient ring
             degree: The degree n such that we work in Z_q[X] / (X^n + 1)
         """
+        if not isinstance(ring, IntegersRing):
+            raise TypeError("ring must be an IntegersRing")
+        if not isinstance(degree, int):
+            raise TypeError("degree must be an integer")
+        if degree <= 0:
+            raise ValueError("degree must be a positive integer")
+        if coefficients is None:
+            raise TypeError("coefficients must not be None")
+
         self.ring = ring
         self.degree = degree
         # Reduce coefficients modulo the ring and then modulo X^n + 1
         self.coefficients = self._reduce(coefficients)
+
+    def __repr__(self):
+        return (
+            "QuotientPolynomial("
+            f"coefficients={self.coefficients}, modulus={self.ring.modulus}, degree={self.degree}"
+            ")"
+        )
+
+    def __eq__(self, other):
+        if not isinstance(other, QuotientPolynomial):
+            return NotImplemented
+        return (
+            self.ring.modulus == other.ring.modulus
+            and self.degree == other.degree
+            and self.coefficients == other.coefficients
+        )
+
+    def is_zero(self):
+        return all(c == 0 for c in self.coefficients)
+
+    def copy(self):
+        return QuotientPolynomial(list(self.coefficients), self.ring, self.degree)
+
+    def to_coefficients(self, length=None):
+        coeffs = list(self.coefficients)
+        if length is None:
+            length = self.degree
+        if length < 0:
+            raise ValueError("length must be non-negative")
+        if len(coeffs) >= length:
+            return coeffs[:length]
+        return coeffs + [0] * (length - len(coeffs))
 
     def _reduce(self, coeffs):
         """Reduce polynomial modulo X^n+1 using X^n = -1 reduction rule.
@@ -339,6 +420,8 @@ class QuotientPolynomial:
         Raises:
             ValueError: If polynomials have different moduli or degrees.
         """
+        if not isinstance(other, QuotientPolynomial):
+            return NotImplemented
         if self.ring.modulus != other.ring.modulus or self.degree != other.degree:
             raise ValueError("Polynomials must be in the same quotient ring")
 
@@ -362,6 +445,8 @@ class QuotientPolynomial:
         Raises:
             ValueError: If polynomials have different moduli or degrees.
         """
+        if not isinstance(other, QuotientPolynomial):
+            return NotImplemented
         if self.ring.modulus != other.ring.modulus or self.degree != other.degree:
             raise ValueError("Polynomials must be in the same quotient ring")
 
@@ -465,6 +550,13 @@ class QuotientPolynomialRing:
             degree (int): The degree n such that we work in Z_q[X]/(X^n+1).
                          Must be a positive integer.
         """
+        if not isinstance(coefficient_ring, IntegersRing):
+            raise TypeError("coefficient_ring must be an IntegersRing")
+        if not isinstance(degree, int):
+            raise TypeError("degree must be an integer")
+        if degree <= 0:
+            raise ValueError("degree must be a positive integer")
+
         self.coefficient_ring = coefficient_ring
         self.degree = degree
 
