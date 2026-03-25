@@ -97,8 +97,8 @@ jobs:
         uses: actions/dependency-review-action@v4
 
   publish-coverage:
-    name: Publish Coverage Report
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/dev'
+    name: Update Coverage Folder
+    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
     needs: tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -122,20 +122,22 @@ jobs:
       - name: Generate coverage files
         run: |
           coverage run -m unittest discover -s tests -p 'test_*.py'
-          coverage html -d public/coverage/html
-          coverage xml -o public/coverage/coverage.xml
-          coverage json -o public/coverage/coverage.json
+          coverage html -d coverage/html
+          coverage xml -o coverage/coverage.xml
+          coverage json -o coverage/coverage.json
 
-      - name: Build badge endpoint JSON
+      - name: Build coverage badge and summary
         run: |
-          python -c "import json; from pathlib import Path; cj=Path('public/coverage/coverage.json'); bj=Path('public/coverage/badge.json'); ih=Path('public/coverage/index.html'); pct=round(float(json.loads(cj.read_text())['totals']['percent_covered']),2); color='brightgreen' if pct>=95 else 'green' if pct>=90 else 'yellowgreen' if pct>=80 else 'yellow' if pct>=70 else 'red'; bj.write_text(json.dumps({'schemaVersion':1,'label':'coverage','message':f'{pct}%','color':color})); ih.write_text('<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\" />\n    <meta http-equiv=\"refresh\" content=\"0; url=./html/index.html\" />\n    <title>Coverage Report</title>\n  </head>\n  <body>\n    <p>Coverage report: <a href=\"./html/index.html\">open</a></p>\n  </body>\n</html>\n')"
+          python scripts/update_coverage_assets.py
 
-      - name: Ensure Pages static serving
-        run: touch public/.nojekyll
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: ./public
+      - name: Commit coverage folder to current branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add coverage
+          if git diff --cached --quiet; then
+            echo "No coverage changes to commit"
+            exit 0
+          fi
+          git commit -m "chore(ci): update coverage report [skip ci]"
+          git push
