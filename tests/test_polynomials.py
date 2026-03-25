@@ -43,6 +43,12 @@ class TestPolynomial(unittest.TestCase):
         p = Polynomial([0, 0, 0], self.Z5)
         self.assertEqual(p.coefficients, [0])
 
+    def test_init_invalid_args(self):
+        with self.assertRaises(TypeError):
+            _ = Polynomial([1, 2], ring="not-a-ring")
+        with self.assertRaises(TypeError):
+            _ = Polynomial(None, self.Z5)
+
     def test_str(self):
         """Test string representation."""
         p = Polynomial([1, 2, 3], self.Z5)
@@ -132,6 +138,15 @@ class TestPolynomial(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = p1 * p2
 
+    def test_eq_repr_and_helpers(self):
+        p1 = Polynomial([1, 2, 0], self.Z5)
+        p2 = Polynomial([1, 2], self.Z5)
+        self.assertEqual(p1, p2)
+        self.assertIn("Polynomial(coefficients=", repr(p1))
+        self.assertFalse(p1.is_zero())
+        self.assertEqual(p1.to_coefficients(4), [1, 2, 0, 0])
+        self.assertEqual(p1.copy(), p1)
+
 
 class TestPolynomialRing(unittest.TestCase):
     """Test cases for PolynomialRing class."""
@@ -188,6 +203,14 @@ class TestQuotientPolynomial(unittest.TestCase):
         self.assertEqual(p.ring, self.Z5)
         # Should have degree < 3
         self.assertLess(len(p.coefficients), 4)
+
+    def test_init_invalid_args(self):
+        with self.assertRaises(TypeError):
+            _ = QuotientPolynomial([1], "bad-ring", degree=3)
+        with self.assertRaises(TypeError):
+            _ = QuotientPolynomial([1], self.Z5, degree="3")
+        with self.assertRaises(ValueError):
+            _ = QuotientPolynomial([1], self.Z5, degree=0)
 
     def test_reduce_basic(self):
         """Test basic reduction of coefficients."""
@@ -374,6 +397,15 @@ class TestQuotientPolynomial(unittest.TestCase):
         with self.assertRaises(ValueError):
             p.is_small(-1)
 
+    def test_eq_repr_and_helpers(self):
+        p1 = QuotientPolynomial([1, 2, 3], self.Z5, degree=4)
+        p2 = QuotientPolynomial([1, 2, 3], self.Z5, degree=4)
+        self.assertEqual(p1, p2)
+        self.assertIn("QuotientPolynomial(coefficients=", repr(p1))
+        self.assertFalse(p1.is_zero())
+        self.assertEqual(p1.to_coefficients(), [1, 2, 3, 0])
+        self.assertEqual(p1.copy(), p1)
+
 
 class TestQuotientPolynomialRing(unittest.TestCase):
     """Test cases for QuotientPolynomialRing class."""
@@ -387,6 +419,14 @@ class TestQuotientPolynomialRing(unittest.TestCase):
         """Test QuotientPolynomialRing initialization."""
         self.assertEqual(self.ring.coefficient_ring, self.Z5)
         self.assertEqual(self.ring.degree, 3)
+
+    def test_init_invalid_args(self):
+        with self.assertRaises(TypeError):
+            _ = QuotientPolynomialRing("not-a-ring", degree=3)
+        with self.assertRaises(TypeError):
+            _ = QuotientPolynomialRing(self.Z5, degree="3")
+        with self.assertRaises(ValueError):
+            _ = QuotientPolynomialRing(self.Z5, degree=0)
 
     def test_polynomial(self):
         """Test creating a quotient polynomial in the ring."""

@@ -14,6 +14,10 @@ class TestModule(unittest.TestCase):
         self.R = QuotientPolynomialRing(self.Z5, degree=3)
         self.M2 = Module(self.R, rank=2)
 
+    def test_module_init_invalid_args(self):
+        with self.assertRaises(TypeError):
+            _ = Module(self.R, rank="2")
+
     def test_element_creation_and_coercion(self):
         v = self.M2.element([[1, 1], 2])
         self.assertIsInstance(v, ModuleElement)
@@ -25,6 +29,14 @@ class TestModule(unittest.TestCase):
     def test_rank_mismatch_raises(self):
         with self.assertRaises(ValueError):
             _ = self.M2.element([1])
+
+    def test_element_repr_eq_helpers(self):
+        v = self.M2.element([[1, 2], [3]])
+        w = self.M2.element([[1, 2], [3]])
+        self.assertEqual(v, w)
+        self.assertIn("ModuleElement(rank=", repr(v))
+        self.assertFalse(v.is_zero())
+        self.assertEqual(v.copy(), v)
 
     def test_add_and_sub(self):
         v = self.M2.element([[1, 1], [2]])

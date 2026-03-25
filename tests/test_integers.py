@@ -22,6 +22,19 @@ class TestIntegersRing(unittest.TestCase):
         self.assertEqual(self.Z5.modulus, 5)
         self.assertEqual(self.Z7.modulus, 7)
 
+    def test_init_invalid_modulus_raises(self):
+        with self.assertRaises(ValueError):
+            _ = IntegersRing(0)
+        with self.assertRaises(ValueError):
+            _ = IntegersRing(-5)
+        with self.assertRaises(TypeError):
+            _ = IntegersRing("5")
+
+    def test_repr_and_eq(self):
+        self.assertEqual(repr(self.Z5), "IntegersRing(modulus=5)")
+        self.assertEqual(self.Z5, IntegersRing(5))
+        self.assertNotEqual(self.Z5, self.Z7)
+
     def test_add(self):
         """Test addition in the ring."""
         self.assertEqual(self.Z5.add(2, 3), 0)  # 2+3=5≡0 (mod 5)
@@ -131,6 +144,19 @@ class TestSymmetricModulo(unittest.TestCase):
         self.assertEqual(sym.symmetric(10), 0)  # 10 ≡ 0 (mod 5), stays 0
         self.assertEqual(sym.symmetric(12), 2)  # 12 ≡ 2 (mod 5), 2 <= 2 so stays 2
         self.assertEqual(sym.symmetric(137), 2)  # 137 ≡ 2 (mod 5), 2 <= 2 so stays 2
+
+    def test_init_invalid_modulus_raises(self):
+        with self.assertRaises(ValueError):
+            _ = SymmetricModulo(0)
+        with self.assertRaises(ValueError):
+            _ = SymmetricModulo(-1)
+        with self.assertRaises(TypeError):
+            _ = SymmetricModulo("3")
+
+    def test_symmetric_requires_integer(self):
+        sym = SymmetricModulo(5)
+        with self.assertRaises(TypeError):
+            _ = sym.symmetric(1.5)
 
 
 if __name__ == "__main__":
