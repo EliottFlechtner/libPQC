@@ -18,7 +18,7 @@ Example:
 
 """
 
-from src.polynomials import QuotientPolynomial, QuotientPolynomialRing
+from .polynomials import QuotientPolynomial, QuotientPolynomialRing
 
 
 class ModuleElement:

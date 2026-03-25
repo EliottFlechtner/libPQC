@@ -1,7 +1,11 @@
 import unittest
 
-from src.module import Module, ModuleElement
-from src.polynomials import IntegersRing, QuotientPolynomial, QuotientPolynomialRing
+from src.core.module import Module, ModuleElement
+from src.core.polynomials import (
+    IntegersRing,
+    QuotientPolynomial,
+    QuotientPolynomialRing,
+)
 
 
 class TestModule(unittest.TestCase):

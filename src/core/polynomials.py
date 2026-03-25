@@ -18,7 +18,7 @@ Example:
     >>> qp = qring.polynomial([1, 2, 3])  # quotient polynomial with automatic reduction
 """
 
-from src.integers import IntegersRing
+from .integers import IntegersRing
 
 
 class Polynomial:
