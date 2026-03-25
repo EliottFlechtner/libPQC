@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (example: v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
+
+      - name: Resolve tag (push)
+        if: github.event_name == 'push'
+        run: echo "RELEASE_TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+
+      - name: Resolve tag (manual)
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "RELEASE_TAG=${{ inputs.tag }}" >> "$GITHUB_ENV"
+
+      - name: Build source bundle
+        run: |
+          mkdir -p dist
+          tar -czf "dist/libPQC-${RELEASE_TAG}.tar.gz" LICENSE README.md src tests scratch.py
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          generate_release_notes: true
+          files: |
+            dist/libPQC-${{ env.RELEASE_TAG }}.tar.gz
