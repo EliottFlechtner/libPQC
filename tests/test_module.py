@@ -17,6 +17,13 @@ class TestModule(unittest.TestCase):
     def test_module_init_invalid_args(self):
         with self.assertRaises(TypeError):
             _ = Module(self.R, rank="2")
+        with self.assertRaises(TypeError):
+            _ = Module("bad-ring", rank=2)
+        with self.assertRaises(ValueError):
+            _ = Module(self.R, rank=0)
+
+    def test_module_repr(self):
+        self.assertIn("Module(modulus=5, degree=3, rank=2)", repr(self.M2))
 
     def test_element_creation_and_coercion(self):
         v = self.M2.element([[1, 1], 2])
@@ -37,6 +44,24 @@ class TestModule(unittest.TestCase):
         self.assertIn("ModuleElement(rank=", repr(v))
         self.assertFalse(v.is_zero())
         self.assertEqual(v.copy(), v)
+
+    def test_element_init_type_errors(self):
+        with self.assertRaises(TypeError):
+            _ = ModuleElement("not-module", [1, 2])
+        with self.assertRaises(TypeError):
+            _ = ModuleElement(self.M2, None)
+
+    def test_element_eq_edge_cases(self):
+        v = self.M2.element([[1], [2]])
+        self.assertIs(v.__eq__(object()), NotImplemented)
+
+        other_module = Module(self.R, rank=2)
+        w = other_module.element([[1], [2]])
+        self.assertFalse(v == w)
+
+    def test_element_str(self):
+        v = self.M2.element([[1, 2], [3]])
+        self.assertTrue(str(v).startswith("("))
 
     def test_add_and_sub(self):
         v = self.M2.element([[1, 1], [2]])
@@ -115,6 +140,37 @@ class TestModule(unittest.TestCase):
             _ = v - w
         with self.assertRaises(ValueError):
             _ = v * w
+
+    def test_add_sub_with_invalid_type(self):
+        v = self.M2.element([[1], [2]])
+        self.assertIs(v.__add__("bad"), NotImplemented)
+        self.assertIs(v.__sub__("bad"), NotImplemented)
+
+    def test_inner_product_requires_module_element(self):
+        v = self.M2.element([[1], [2]])
+        with self.assertRaises(TypeError):
+            _ = v.inner_product("bad")
+
+    def test_coerce_entry_and_scalar_edge_cases(self):
+        # Entry polynomial with wrong quotient degree should be rejected.
+        wrong_ring = QuotientPolynomialRing(self.Z5, degree=4)
+        wrong_poly = wrong_ring.polynomial([1, 2])
+        with self.assertRaises(ValueError):
+            _ = self.M2._coerce_entry(wrong_poly)
+
+        with self.assertRaises(TypeError):
+            _ = self.M2._coerce_entry(3.14)
+
+        # Scalar polynomial with wrong quotient degree should be rejected.
+        with self.assertRaises(ValueError):
+            _ = self.M2._coerce_scalar(wrong_poly)
+
+        # Tuple path is supported.
+        tuple_scalar = self.M2._coerce_scalar((1, 2))
+        self.assertEqual(tuple_scalar.coefficients, [1, 2])
+
+        with self.assertRaises(TypeError):
+            _ = self.M2._coerce_scalar(3.14)
 
     def test_inf_norm_zero_vector(self):
         """Test infinity norm of zero vector."""

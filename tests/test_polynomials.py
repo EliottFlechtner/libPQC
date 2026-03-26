@@ -43,6 +43,10 @@ class TestPolynomial(unittest.TestCase):
         p = Polynomial([0, 0, 0], self.Z5)
         self.assertEqual(p.coefficients, [0])
 
+    def test_init_empty_coefficients(self):
+        p = Polynomial([], self.Z5)
+        self.assertEqual(p.coefficients, [0])
+
     def test_init_invalid_args(self):
         with self.assertRaises(TypeError):
             _ = Polynomial([1, 2], ring="not-a-ring")
@@ -147,6 +151,23 @@ class TestPolynomial(unittest.TestCase):
         self.assertEqual(p1.to_coefficients(4), [1, 2, 0, 0])
         self.assertEqual(p1.copy(), p1)
 
+    def test_eq_and_type_edge_cases(self):
+        p = Polynomial([1, 2], self.Z5)
+        self.assertIs(p.__eq__(object()), NotImplemented)
+
+    def test_to_coefficients_edge_cases(self):
+        p = Polynomial([1, 2, 3], self.Z5)
+        self.assertEqual(p.to_coefficients(), [1, 2, 3])
+        self.assertEqual(p.to_coefficients(2), [1, 2])
+        with self.assertRaises(ValueError):
+            _ = p.to_coefficients(-1)
+
+    def test_add_sub_mul_with_invalid_type(self):
+        p = Polynomial([1, 2], self.Z5)
+        self.assertIs(p.__add__("bad"), NotImplemented)
+        self.assertIs(p.__sub__("bad"), NotImplemented)
+        self.assertIs(p.__mul__("bad"), NotImplemented)
+
 
 class TestPolynomialRing(unittest.TestCase):
     """Test cases for PolynomialRing class."""
@@ -211,6 +232,8 @@ class TestQuotientPolynomial(unittest.TestCase):
             _ = QuotientPolynomial([1], self.Z5, degree="3")
         with self.assertRaises(ValueError):
             _ = QuotientPolynomial([1], self.Z5, degree=0)
+        with self.assertRaises(TypeError):
+            _ = QuotientPolynomial(None, self.Z5, degree=3)
 
     def test_reduce_basic(self):
         """Test basic reduction of coefficients."""
@@ -405,6 +428,28 @@ class TestQuotientPolynomial(unittest.TestCase):
         self.assertFalse(p1.is_zero())
         self.assertEqual(p1.to_coefficients(), [1, 2, 3, 0])
         self.assertEqual(p1.copy(), p1)
+
+    def test_eq_and_to_coefficients_edge_cases(self):
+        p = QuotientPolynomial([1, 2, 3], self.Z5, degree=4)
+        self.assertIs(p.__eq__(object()), NotImplemented)
+        self.assertEqual(p.to_coefficients(2), [1, 2])
+        with self.assertRaises(ValueError):
+            _ = p.to_coefficients(-1)
+
+    def test_add_sub_with_invalid_type(self):
+        p = QuotientPolynomial([1, 2], self.Z5, degree=3)
+        self.assertIs(p.__add__("bad"), NotImplemented)
+        self.assertIs(p.__sub__("bad"), NotImplemented)
+
+    def test_sub_same_ring_and_degree_required(self):
+        p1 = QuotientPolynomial([1, 2], self.Z5, degree=3)
+        p2 = QuotientPolynomial([1, 2], self.Z7, degree=3)
+        with self.assertRaises(ValueError):
+            _ = p1 - p2
+
+        p3 = QuotientPolynomial([1, 2], self.Z5, degree=4)
+        with self.assertRaises(ValueError):
+            _ = p1 - p3
 
 
 class TestQuotientPolynomialRing(unittest.TestCase):

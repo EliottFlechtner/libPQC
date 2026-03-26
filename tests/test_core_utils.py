@@ -2,21 +2,28 @@ import unittest
 
 from src.core.integers import IntegersRing
 from src.core.module import Module
-from src.core.polynomials import QuotientPolynomialRing
+from src.core.polynomials import Polynomial, QuotientPolynomialRing
 from src.core.sampling import (
     make_deterministic_rng,
+    sample_centered_binomial_coefficients,
+    sample_small_coefficients,
     sample_small_matrix,
+    sample_small_polynomial,
     sample_small_vector,
+    sample_uniform_coefficients,
     sample_uniform_matrix,
+    sample_uniform_polynomial,
     sample_uniform_vector,
 )
 from src.core.serialization import (
     SCHEMA_VERSION,
     from_bytes,
+    from_json,
     module_element_from_dict,
     module_element_to_dict,
     polynomial_from_dict,
     polynomial_to_dict,
+    to_json,
     to_bytes,
 )
 
@@ -30,6 +37,11 @@ class TestSamplingUtilities(unittest.TestCase):
     def test_deterministic_rng_reproducible(self):
         r1 = make_deterministic_rng(1234)
         r2 = make_deterministic_rng(1234)
+        self.assertEqual(r1.randrange(1000), r2.randrange(1000))
+
+    def test_deterministic_rng_from_bytes(self):
+        r1 = make_deterministic_rng(b"seed")
+        r2 = make_deterministic_rng(b"seed")
         self.assertEqual(r1.randrange(1000), r2.randrange(1000))
 
     def test_uniform_vector_shape(self):
@@ -63,6 +75,41 @@ class TestSamplingUtilities(unittest.TestCase):
         self.assertEqual(len(matrix), 4)
         self.assertEqual(len(matrix[0]), 2)
 
+    def test_sampling_validation_errors(self):
+        with self.assertRaises(ValueError):
+            _ = sample_uniform_coefficients(modulus=0, length=3)
+        with self.assertRaises(ValueError):
+            _ = sample_uniform_coefficients(modulus=17, length=-1)
+
+        with self.assertRaises(ValueError):
+            _ = sample_small_coefficients(bound=-1, length=3)
+        with self.assertRaises(ValueError):
+            _ = sample_small_coefficients(bound=2, length=-1)
+
+        with self.assertRaises(ValueError):
+            _ = sample_centered_binomial_coefficients(eta=-1, length=2)
+        with self.assertRaises(ValueError):
+            _ = sample_centered_binomial_coefficients(eta=2, length=-1)
+
+        with self.assertRaises(ValueError):
+            _ = sample_small_polynomial(self.ring, eta=-1)
+        with self.assertRaises(ValueError):
+            _ = sample_small_polynomial(self.ring, eta=2, method="bad")
+
+        with self.assertRaises(TypeError):
+            _ = sample_uniform_vector("not-a-module")
+        with self.assertRaises(TypeError):
+            _ = sample_small_vector("not-a-module", eta=2)
+
+        with self.assertRaises(ValueError):
+            _ = sample_uniform_matrix(self.ring, rows=-1, cols=2)
+        with self.assertRaises(ValueError):
+            _ = sample_small_matrix(self.ring, rows=1, cols=-1, eta=2)
+
+    def test_uniform_polynomial_uses_ring_degree(self):
+        p = sample_uniform_polynomial(self.ring, rng=make_deterministic_rng(5))
+        self.assertLessEqual(len(p.coefficients), self.ring.degree)
+
 
 class TestSerializationUtilities(unittest.TestCase):
     def setUp(self):
@@ -95,6 +142,63 @@ class TestSerializationUtilities(unittest.TestCase):
         payload["version"] = 999
         with self.assertRaises(ValueError):
             _ = polynomial_from_dict(payload)
+
+    def test_polynomial_roundtrip_non_quotient(self):
+        zq = IntegersRing(19)
+        p = Polynomial([1, 2, 3], zq)
+        payload = polynomial_to_dict(p)
+        restored = polynomial_from_dict(payload)
+        self.assertEqual(restored, p)
+
+    def test_polynomial_from_dict_validation_errors(self):
+        with self.assertRaises(TypeError):
+            _ = polynomial_from_dict("bad")
+
+        with self.assertRaises(ValueError):
+            _ = polynomial_from_dict({"type": "bad", "version": SCHEMA_VERSION})
+
+        with self.assertRaises(TypeError):
+            _ = polynomial_from_dict(
+                {
+                    "type": "polynomial",
+                    "version": SCHEMA_VERSION,
+                    "modulus": 19,
+                    "coefficients": "bad",
+                }
+            )
+
+    def test_module_element_from_dict_validation_errors(self):
+        with self.assertRaises(TypeError):
+            _ = module_element_from_dict("bad")
+
+        payload = module_element_to_dict(self.element)
+
+        wrong_type = dict(payload)
+        wrong_type["type"] = "bad"
+        with self.assertRaises(ValueError):
+            _ = module_element_from_dict(wrong_type)
+
+        wrong_version = dict(payload)
+        wrong_version["version"] = 999
+        with self.assertRaises(ValueError):
+            _ = module_element_from_dict(wrong_version)
+
+        wrong_entries = dict(payload)
+        wrong_entries["entries"] = "bad"
+        with self.assertRaises(TypeError):
+            _ = module_element_from_dict(wrong_entries)
+
+    def test_json_and_bytes_type_validation(self):
+        payload = polynomial_to_dict(self.poly)
+        encoded = to_json(payload)
+        decoded = from_json(encoded)
+        self.assertEqual(decoded, payload)
+
+        with self.assertRaises(TypeError):
+            _ = from_json(123)
+
+        with self.assertRaises(TypeError):
+            _ = from_bytes("bad")
 
 
 if __name__ == "__main__":

@@ -158,6 +158,19 @@ class TestSymmetricModulo(unittest.TestCase):
         with self.assertRaises(TypeError):
             _ = sym.symmetric(1.5)
 
+    def test_repr_and_eq_edge_cases(self):
+        sym = SymmetricModulo(7)
+        self.assertEqual(repr(sym), "SymmetricModulo(modulus=7)")
+        self.assertTrue(sym == SymmetricModulo(7))
+        self.assertFalse(sym == SymmetricModulo(5))
+        self.assertIs(sym.__eq__(object()), NotImplemented)
+
+
+class TestIntegersRingEqEdgeCases(unittest.TestCase):
+    def test_eq_with_non_ring(self):
+        zq = IntegersRing(11)
+        self.assertIs(zq.__eq__("not-a-ring"), NotImplemented)
+
 
 if __name__ == "__main__":
     unittest.main()
