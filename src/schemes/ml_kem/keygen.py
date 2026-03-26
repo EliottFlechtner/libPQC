@@ -1,5 +1,6 @@
-from core import sampling, polynomials, integers, module
+from core import sampling, polynomials, integers, module, serialization
 from .params import ML_KEM_512, ML_KEM_768, ML_KEM_1024, ML_KEM_PARAM_SETS
+from .vectors import expand_matrix_a
 from typing import Dict, Any, Tuple
 
 
@@ -49,8 +50,8 @@ def keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
     q = resolved["q"]  # modulus
     n = resolved["n"]  # degree of the polynomial ring
     k = resolved["k"]  # number of rows & cols in A
-    eta1 = resolved["eta1"]  # secret bound
-    eta2 = resolved["eta2"]  # error bound
+    eta1 = resolved["eta1"]  # secret/error CBD parameter for Kyber-PKE keygen
+    eta2 = resolved["eta2"]  # kept for compatibility with the parameter schema
     du = resolved["du"]  # public key compression parameter
     dv = resolved["dv"]  # secret key compression parameter
 
@@ -58,24 +59,54 @@ def keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
     R_q = polynomials.QuotientPolynomialRing(Z_q, degree=n)
     R_q_module_k = module.Module(R_q, rank=k)
 
-    # Domain-separated 256-bit seeds for keygen components.
-    seeds = sampling.generate_mlkem_keygen_seeds()
-    rho = seeds["rho"]  # public seed used for A generation
-    s_seed = seeds["s_seed"]  # secret seed used for s
-    e_seed = seeds["e_seed"]  # secret seed used for e
-    pk_seed = seeds["pk_seed"]  # public-key derivation seed
+    # Kyber-PKE style seed workflow:
+    # - eta: public 256-bit seed used to expand A
+    # - sigma-derived streams: deterministic sampling for s and e
+    master_seed = sampling.random_seed(32)
+    eta = sampling.derive_seed(master_seed, "kyber-pke-eta", 32)
+    sigma = sampling.derive_seed(master_seed, "kyber-pke-sigma", 32)
 
-    # Deterministic RNG streams derived from those seeds.
-    rng_a = sampling.make_deterministic_rng(rho)
-    rng_s = sampling.make_deterministic_rng(s_seed)
-    rng_e = sampling.make_deterministic_rng(e_seed)
+    rng_s = sampling.make_deterministic_rng(sampling.derive_seed(sigma, "s", 32))
+    rng_e = sampling.make_deterministic_rng(sampling.derive_seed(sigma, "e", 32))
 
-    # Placeholder generation steps (scaffold only, not final ML-KEM encoding).
-    _A = sampling.sample_uniform_matrix(R_q, rows=k, cols=k, rng=rng_a)
-    _s = sampling.sample_small_vector(R_q_module_k, eta=eta1, method="cbd", rng=rng_s)
-    _e = sampling.sample_small_vector(R_q_module_k, eta=eta2, method="cbd", rng=rng_e)
+    # 1) A = Expand(eta)
+    A = expand_matrix_a(eta, R_q, k)
 
-    # Placeholder key material until full pack/compress routines are implemented.
-    public_key = rho + pk_seed
-    secret_key = s_seed + e_seed
+    # 2) Sample s and e from CBD_{eta1}
+    s = sampling.sample_small_vector(R_q_module_k, eta=eta1, method="cbd", rng=rng_s)
+    e = sampling.sample_small_vector(R_q_module_k, eta=eta1, method="cbd", rng=rng_e)
+
+    # 3) Compute t = A*s + e
+    t_entries = []
+    for i in range(k):
+        acc = R_q.zero()
+        for j in range(k):
+            acc = acc + (A[i][j] * s.entries[j])
+        t_entries.append(acc + e.entries[i])
+    t = R_q_module_k.element(t_entries)
+
+    # 4) Public key is (eta, t), secret key is s.
+    param_name = resolved.get("name", "custom")
+    public_payload = {
+        "version": 1,
+        "type": "ml_kem_pke_public_key",
+        "params": param_name,
+        "q": q,
+        "n": n,
+        "k": k,
+        "du": du,
+        "dv": dv,
+        "eta2": eta2,
+        "eta": eta.hex(),
+        "t": serialization.module_element_to_dict(t),
+    }
+    secret_payload = {
+        "version": 1,
+        "type": "ml_kem_pke_secret_key",
+        "params": param_name,
+        "s": serialization.module_element_to_dict(s),
+    }
+
+    public_key = serialization.to_bytes(public_payload)
+    secret_key = serialization.to_bytes(secret_payload)
     return public_key, secret_key
