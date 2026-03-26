@@ -19,6 +19,7 @@ Example:
 """
 
 from .integers import IntegersRing
+from .ntt import negacyclic_convolution_ntt, supports_negacyclic_ntt
 
 
 class Polynomial:
@@ -476,6 +477,17 @@ class QuotientPolynomial:
 
         if self.ring.modulus != other.ring.modulus or self.degree != other.degree:
             raise ValueError("Polynomials must be in the same quotient ring")
+
+        # Fast path for compatible rings: use NTT-based negacyclic convolution.
+        if supports_negacyclic_ntt(self.ring.modulus, self.degree):
+            lhs = self.to_coefficients(self.degree)
+            rhs = other.to_coefficients(self.degree)
+            try:
+                product_coeffs = negacyclic_convolution_ntt(lhs, rhs, self.ring.modulus)
+                return QuotientPolynomial(product_coeffs, self.ring, self.degree)
+            except ValueError:
+                # Fall back to generic schoolbook path when NTT preconditions fail.
+                pass
 
         # Multiply polynomials naively first
         new_coefficients = [0] * (len(self.coefficients) + len(other.coefficients) - 1)
