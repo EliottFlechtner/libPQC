@@ -13,8 +13,14 @@ class TestMlKemKeygen(unittest.TestCase):
         self.assertEqual(pk_obj["type"], "ml_kem_pke_public_key")
         self.assertEqual(sk_obj["type"], "ml_kem_pke_secret_key")
 
-        self.assertIn("eta", pk_obj)
-        self.assertEqual(len(bytes.fromhex(pk_obj["eta"])), 32)
+        self.assertIn("rho", pk_obj)
+        self.assertEqual(len(bytes.fromhex(pk_obj["rho"])), 32)
+        self.assertNotIn("q", pk_obj)
+        self.assertNotIn("n", pk_obj)
+        self.assertNotIn("k", pk_obj)
+        self.assertNotIn("du", pk_obj)
+        self.assertNotIn("dv", pk_obj)
+        self.assertNotIn("eta2", pk_obj)
 
         t_payload = pk_obj["t"]
         s_payload = sk_obj["s"]
