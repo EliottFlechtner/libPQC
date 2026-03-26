@@ -2,6 +2,7 @@
 
 from .integers import IntegersRing, SymmetricModulo
 from .module import Module, ModuleElement
+from .ntt import negacyclic_convolution_ntt, supports_negacyclic_ntt
 from .polynomials import (
     Polynomial,
     PolynomialRing,
@@ -44,6 +45,8 @@ __all__ = [
     "QuotientPolynomialRing",
     "Module",
     "ModuleElement",
+    "supports_negacyclic_ntt",
+    "negacyclic_convolution_ntt",
     "random_seed",
     "derive_seed",
     "generate_mlkem_keygen_seeds",
