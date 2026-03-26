@@ -1,7 +1,11 @@
 import unittest
 
 from src.core.serialization import from_bytes
-from src.schemes.ml_kem.keygen import keygen
+from src.schemes.ml_kem.keygen import (
+    kyber_pke_decrypt,
+    kyber_pke_encrypt,
+    kyber_pke_keygen,
+)
 from src.schemes.ml_kem.params import ML_KEM_512, ML_KEM_768, ML_KEM_1024
 
 
@@ -35,7 +39,7 @@ class TestMlKemKeygen(unittest.TestCase):
             (ML_KEM_768, 3),
             (ML_KEM_1024, 4),
         ):
-            pk, sk = keygen(params)
+            pk, sk = kyber_pke_keygen(params)
             self.assertIsInstance(pk, bytes)
             self.assertIsInstance(sk, bytes)
             self._assert_key_structure(pk, sk, expected_k)
@@ -49,24 +53,41 @@ class TestMlKemKeygen(unittest.TestCase):
             ("768", 3),
             ("1024", 4),
         ):
-            pk, sk = keygen(preset)
+            pk, sk = kyber_pke_keygen(preset)
             self._assert_key_structure(pk, sk, expected_k)
 
     def test_keygen_with_name_inside_dict(self):
-        pk, sk = keygen({"name": "ML-KEM-768"})
+        pk, sk = kyber_pke_keygen({"name": "ML-KEM-768"})
         self._assert_key_structure(pk, sk, expected_k=3)
 
     def test_keygen_invalid_preset_raises(self):
         with self.assertRaises(ValueError):
-            _ = keygen("ML-KEM-999")
+            _ = kyber_pke_keygen("ML-KEM-999")
 
     def test_keygen_missing_required_params_raises(self):
         with self.assertRaises(ValueError):
-            _ = keygen({"name": "custom-no-fields"})
+            _ = kyber_pke_keygen({"name": "custom-no-fields"})
 
     def test_keygen_invalid_params_type_raises(self):
         with self.assertRaises(TypeError):
-            _ = keygen(768)  # type: ignore[arg-type]
+            _ = kyber_pke_keygen(768)  # type: ignore[arg-type]
+
+    def test_encrypt_decrypt_roundtrip(self):
+        pk, sk = kyber_pke_keygen("ML-KEM-768")
+        message = bytes(range(32))
+        ciphertext = kyber_pke_encrypt(
+            pk,
+            message,
+            params="ML-KEM-768",
+            coins=b"c" * 32,
+        )
+        recovered = kyber_pke_decrypt(ciphertext, sk, params="ML-KEM-768")
+        self.assertEqual(recovered, message)
+
+    def test_encrypt_requires_32_byte_message(self):
+        pk, _ = kyber_pke_keygen("ML-KEM-768")
+        with self.assertRaises(ValueError):
+            _ = kyber_pke_encrypt(pk, b"short", params="ML-KEM-768")
 
 
 if __name__ == "__main__":
