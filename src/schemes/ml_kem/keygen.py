@@ -1,4 +1,4 @@
-from core import sampling, polynomials, integers, module, serialization
+from src.core import sampling, polynomials, integers, module, serialization
 from .params import ML_KEM_512, ML_KEM_768, ML_KEM_1024, ML_KEM_PARAM_SETS
 from .vectors import expand_matrix_a
 from typing import Dict, Any, Tuple
@@ -51,26 +51,23 @@ def keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
     n = resolved["n"]  # degree of the polynomial ring
     k = resolved["k"]  # number of rows & cols in A
     eta1 = resolved["eta1"]  # secret/error CBD parameter for Kyber-PKE keygen
-    eta2 = resolved["eta2"]  # kept for compatibility with the parameter schema
-    du = resolved["du"]  # public key compression parameter
-    dv = resolved["dv"]  # secret key compression parameter
 
     Z_q = integers.IntegersRing(q)
     R_q = polynomials.QuotientPolynomialRing(Z_q, degree=n)
     R_q_module_k = module.Module(R_q, rank=k)
 
     # Kyber-PKE style seed workflow:
-    # - eta: public 256-bit seed used to expand A
+    # - rho: public 256-bit seed used to expand A
     # - sigma-derived streams: deterministic sampling for s and e
     master_seed = sampling.random_seed(32)
-    eta = sampling.derive_seed(master_seed, "kyber-pke-eta", 32)
+    rho = sampling.derive_seed(master_seed, "kyber-pke-rho", 32)
     sigma = sampling.derive_seed(master_seed, "kyber-pke-sigma", 32)
 
     rng_s = sampling.make_deterministic_rng(sampling.derive_seed(sigma, "s", 32))
     rng_e = sampling.make_deterministic_rng(sampling.derive_seed(sigma, "e", 32))
 
-    # 1) A = Expand(eta)
-    A = expand_matrix_a(eta, R_q, k)
+    # 1) A = Expand(rho) to matrix A ∈ R_q^(k×k)
+    A = expand_matrix_a(rho, R_q, k)
 
     # 2) Sample s and e from CBD_{eta1}
     s = sampling.sample_small_vector(R_q_module_k, eta=eta1, method="cbd", rng=rng_s)
@@ -85,19 +82,13 @@ def keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
         t_entries.append(acc + e.entries[i])
     t = R_q_module_k.element(t_entries)
 
-    # 4) Public key is (eta, t), secret key is s.
+    # 4) Public key is (rho, t), secret key is s.
     param_name = resolved.get("name", "custom")
     public_payload = {
         "version": 1,
         "type": "ml_kem_pke_public_key",
         "params": param_name,
-        "q": q,
-        "n": n,
-        "k": k,
-        "du": du,
-        "dv": dv,
-        "eta2": eta2,
-        "eta": eta.hex(),
+        "rho": rho.hex(),
         "t": serialization.module_element_to_dict(t),
     }
     secret_payload = {
