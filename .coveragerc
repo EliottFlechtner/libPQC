@@ -4,7 +4,10 @@ source =
     src
 omit =
     */__init__.py
-    src/schemes/*
+    src/schemes/ml_dsa/*
+    src/schemes/ml_kem/encaps.py
+    src/schemes/ml_kem/decaps.py
+    src/schemes/ml_kem/ml_kem.py
     src/comms/*
     src/experiments/*
     src/app/*
@@ -14,7 +17,10 @@ show_missing = True
 skip_covered = False
 omit =
     */__init__.py
-    src/schemes/*
+    src/schemes/ml_dsa/*
+    src/schemes/ml_kem/encaps.py
+    src/schemes/ml_kem/decaps.py
+    src/schemes/ml_kem/ml_kem.py
     src/comms/*
     src/experiments/*
     src/app/*

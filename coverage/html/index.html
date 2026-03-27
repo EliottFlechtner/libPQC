@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Coverage report</title>
-    <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
-    <link rel="stylesheet" href="style_cb_9ff733b0.css" type="text/css">
-    <script src="coverage_html_cb_dd2e7eb5.js" defer></script>
+    <link rel="icon" sizes="32x32" href="favicon_32.png">
+    <link rel="stylesheet" href="style.css" type="text/css">
+    <script type="text/javascript" src="coverage_html.js" defer></script>
 </head>
 <body class="indexfile">
 <header>
@@ -16,13 +16,13 @@
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
             <label for="help_panel_state">
-                <img id="keyboard_icon" src="keybd_closed_cb_900cfef5.png" alt="Show/hide keyboard shortcuts">
+                <img id="keyboard_icon" src="keybd_closed.png" alt="Show/hide keyboard shortcuts" />
             </label>
             <div id="help_panel">
                 <p class="legend">Shortcuts on this page</p>
                 <div class="keyhelp">
                     <p>
-                        <kbd>f</kbd>
+                        <kbd>n</kbd>
                         <kbd>s</kbd>
                         <kbd>m</kbd>
                         <kbd>x</kbd>
@@ -43,150 +43,137 @@
             </div>
         </aside>
         <form id="filter_container">
-            <input id="filter" type="text" value="" placeholder="filter...">
-            <div>
-                <input id="hide100" type="checkbox" >
-                <label for="hide100">hide covered</label>
-            </div>
+            <input id="filter" type="text" value="" placeholder="filter..." />
         </form>
-        <h2>
-                <a class="button current">Files</a>
-                <a class="button" href="function_index.html">Functions</a>
-                <a class="button" href="class_index.html">Classes</a>
-        </h2>
         <p class="text">
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.13.5">coverage.py v7.13.5</a>,
-            created at 2026-03-27 21:05 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.4.4">coverage.py v7.4.4</a>,
+            created at 2026-03-27 16:13 -0500
         </p>
     </div>
 </header>
 <main id="index">
     <table class="index" data-sortable>
         <thead>
-            <tr class="tablehead grouphead">
-                <th class="spacer">&nbsp;</th>
-                <th class="spacer">&nbsp;</th>
-                <th class="left" colspan="4">Statements</th>
-                <th class="spacer">&nbsp;</th>
-                <th class="left" colspan="3">Branches</th>
-                <th class="spacer">&nbsp;</th>
-                <th>Total</th>
-            </tr>
             <tr class="tablehead" title="Click to sort">
-                <th id="file" class="name" aria-sort="none" data-shortcut="f">File<span class="arrows"></span></th>
-                <th class="spacer">&nbsp;</th>
-                <th id="statements_coverage" aria-sort="none" data-default-sort-order="descending">coverage<span class="arrows"></span></th>
-                <th id="statements" aria-sort="none" data-default-sort-order="descending" data-shortcut="s">statements<span class="arrows"></span></th>
-                <th id="missing" aria-sort="none" data-default-sort-order="descending" data-shortcut="m">missing<span class="arrows"></span></th>
-                <th id="excluded" aria-sort="none" data-default-sort-order="descending" data-shortcut="x">excluded<span class="arrows"></span></th>
-                <th class="spacer">&nbsp;</th>
-                <th id="branches_coverage" aria-sort="none" data-default-sort-order="descending">coverage<span class="arrows"></span></th>
-                <th id="branches" aria-sort="none" data-default-sort-order="descending" data-shortcut="b">branches<span class="arrows"></span></th>
-                <th id="partial" aria-sort="none" data-default-sort-order="descending" data-shortcut="p">partial<span class="arrows"></span></th>
-                <th class="spacer">&nbsp;</th>
-                <th id="coverage" aria-sort="none" data-shortcut="c">coverage<span class="arrows"></span></th>
+                <th class="name left" aria-sort="none" data-shortcut="n">Module</th>
+                <th aria-sort="none" data-default-sort-order="descending" data-shortcut="s">statements</th>
+                <th aria-sort="none" data-default-sort-order="descending" data-shortcut="m">missing</th>
+                <th aria-sort="none" data-default-sort-order="descending" data-shortcut="x">excluded</th>
+                <th aria-sort="none" data-default-sort-order="descending" data-shortcut="b">branches</th>
+                <th aria-sort="none" data-default-sort-order="descending" data-shortcut="p">partial</th>
+                <th class="right" aria-sort="none" data-shortcut="c">coverage</th>
             </tr>
         </thead>
         <tbody>
-            <tr class="region">
-                <td class="name"><a href="z_0618756b1ff51bca_integers_py.html">src&#8201;/&#8201;core&#8201;/&#8201;integers.py</a></td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="48 48">100%</td>
+            <tr class="file">
+                <td class="name left"><a href="d_0618756b1ff51bca_integers_py.html">src/core/integers.py</a></td>
                 <td>48</td>
                 <td>0</td>
                 <td>0</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="16 16">100%</td>
                 <td>16</td>
                 <td>0</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="64 64">100%</td>
+                <td class="right" data-ratio="64 64">100%</td>
             </tr>
-            <tr class="region">
-                <td class="name"><a href="z_0618756b1ff51bca_module_py.html">src&#8201;/&#8201;core&#8201;/&#8201;module.py</a></td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="106 106">100%</td>
+            <tr class="file">
+                <td class="name left"><a href="d_0618756b1ff51bca_module_py.html">src/core/module.py</a></td>
                 <td>106</td>
                 <td>0</td>
                 <td>0</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="52 52">100%</td>
-                <td>52</td>
-                <td>0</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="158 158">100%</td>
+                <td>58</td>
+                <td>1</td>
+                <td class="right" data-ratio="163 164">99%</td>
             </tr>
-            <tr class="region">
-                <td class="name"><a href="z_0618756b1ff51bca_ntt_py.html">src&#8201;/&#8201;core&#8201;/&#8201;ntt.py</a></td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="83 92">90%</td>
+            <tr class="file">
+                <td class="name left"><a href="d_0618756b1ff51bca_ntt_py.html">src/core/ntt.py</a></td>
                 <td>92</td>
                 <td>9</td>
                 <td>0</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="34 44">77%</td>
                 <td>44</td>
                 <td>10</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="117 136">86%</td>
+                <td class="right" data-ratio="117 136">86%</td>
             </tr>
-            <tr class="region">
-                <td class="name"><a href="z_0618756b1ff51bca_polynomials_py.html">src&#8201;/&#8201;core&#8201;/&#8201;polynomials.py</a></td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="237 239">99%</td>
+            <tr class="file">
+                <td class="name left"><a href="d_0618756b1ff51bca_polynomials_py.html">src/core/polynomials.py</a></td>
                 <td>239</td>
                 <td>2</td>
                 <td>0</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="114 118">97%</td>
-                <td>118</td>
-                <td>4</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="351 357">98%</td>
+                <td>124</td>
+                <td>6</td>
+                <td class="right" data-ratio="355 363">98%</td>
             </tr>
-            <tr class="region">
-                <td class="name"><a href="z_0618756b1ff51bca_sampling_py.html">src&#8201;/&#8201;core&#8201;/&#8201;sampling.py</a></td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="103 107">96%</td>
+            <tr class="file">
+                <td class="name left"><a href="d_0618756b1ff51bca_sampling_py.html">src/core/sampling.py</a></td>
                 <td>107</td>
                 <td>4</td>
                 <td>0</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="50 54">93%</td>
-                <td>54</td>
+                <td>58</td>
                 <td>4</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="153 161">95%</td>
+                <td class="right" data-ratio="157 165">95%</td>
             </tr>
-            <tr class="region">
-                <td class="name"><a href="z_0618756b1ff51bca_serialization_py.html">src&#8201;/&#8201;core&#8201;/&#8201;serialization.py</a></td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="61 61">100%</td>
+            <tr class="file">
+                <td class="name left"><a href="d_0618756b1ff51bca_serialization_py.html">src/core/serialization.py</a></td>
                 <td>61</td>
                 <td>0</td>
                 <td>0</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="24 24">100%</td>
                 <td>24</td>
                 <td>0</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="85 85">100%</td>
+                <td class="right" data-ratio="85 85">100%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="d_c0b599ce0f8be8c8_keygen_py.html">src/schemes/ml_kem/keygen.py</a></td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="right" data-ratio="2 2">100%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="d_c0b599ce0f8be8c8_kyber_pke_py.html">src/schemes/ml_kem/kyber_pke.py</a></td>
+                <td>138</td>
+                <td>4</td>
+                <td>0</td>
+                <td>42</td>
+                <td>4</td>
+                <td class="right" data-ratio="172 180">96%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="d_c0b599ce0f8be8c8_params_py.html">src/schemes/ml_kem/params.py</a></td>
+                <td>5</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="right" data-ratio="5 5">100%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="d_c0b599ce0f8be8c8_pke_utils_py.html">src/schemes/ml_kem/pke_utils.py</a></td>
+                <td>130</td>
+                <td>2</td>
+                <td>0</td>
+                <td>70</td>
+                <td>2</td>
+                <td class="right" data-ratio="196 200">98%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="d_c0b599ce0f8be8c8_vectors_py.html">src/schemes/ml_kem/vectors.py</a></td>
+                <td>56</td>
+                <td>0</td>
+                <td>0</td>
+                <td>28</td>
+                <td>0</td>
+                <td class="right" data-ratio="84 84">100%</td>
             </tr>
         </tbody>
         <tfoot>
             <tr class="total">
-                <td class="name">Total</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="638 653">98%</td>
-                <td>653</td>
-                <td>15</td>
+                <td class="name left">Total</td>
+                <td>984</td>
+                <td>21</td>
                 <td>0</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="290 308">94%</td>
-                <td>308</td>
-                <td>18</td>
-                <td class="spacer">&nbsp;</td>
-                <td data-ratio="928 961">97%</td>
+                <td>464</td>
+                <td>27</td>
+                <td class="right" data-ratio="1400 1448">97%</td>
             </tr>
         </tfoot>
     </table>
@@ -197,16 +184,16 @@
 <footer>
     <div class="content">
         <p>
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.13.5">coverage.py v7.13.5</a>,
-            created at 2026-03-27 21:05 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.4.4">coverage.py v7.4.4</a>,
+            created at 2026-03-27 16:13 -0500
         </p>
     </div>
     <aside class="hidden">
-        <a id="prevFileLink" class="nav" href="z_0618756b1ff51bca_serialization_py.html"></a>
-        <a id="nextFileLink" class="nav" href="z_0618756b1ff51bca_integers_py.html"></a>
-        <button type="button" class="button_prev_file" data-shortcut="["></button>
-        <button type="button" class="button_next_file" data-shortcut="]"></button>
-        <button type="button" class="button_show_hide_help" data-shortcut="?"></button>
+        <a id="prevFileLink" class="nav" href="d_c0b599ce0f8be8c8_vectors_py.html"/>
+        <a id="nextFileLink" class="nav" href="d_0618756b1ff51bca_integers_py.html"/>
+        <button type="button" class="button_prev_file" data-shortcut="["/>
+        <button type="button" class="button_next_file" data-shortcut="]"/>
+        <button type="button" class="button_show_hide_help" data-shortcut="?"/>
     </aside>
 </footer>
 </body>
