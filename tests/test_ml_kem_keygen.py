@@ -1,7 +1,7 @@
 import unittest
 
 from src.core.serialization import from_bytes
-from src.schemes.ml_kem.keygen import (
+from src.schemes.ml_kem.kyber_pke import (
     kyber_pke_decrypt,
     kyber_pke_encrypt,
     kyber_pke_keygen,
