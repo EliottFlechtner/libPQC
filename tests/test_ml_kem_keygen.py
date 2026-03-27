@@ -84,6 +84,23 @@ class TestMlKemKeygen(unittest.TestCase):
         recovered = kyber_pke_decryption(ciphertext, sk, params="ML-KEM-768")
         self.assertEqual(recovered, message)
 
+    def test_ciphertext_contains_compressed_c1_c2(self):
+        pk, _ = kyber_pke_keygen("ML-KEM-768")
+        message = bytes(range(32))
+        ciphertext = kyber_pke_encryption(
+            pk,
+            message,
+            params="ML-KEM-768",
+            coins=b"d" * 32,
+        )
+
+        ct_obj = from_bytes(ciphertext)
+        self.assertEqual(ct_obj["type"], "ml_kem_pke_ciphertext")
+        self.assertIn("c1", ct_obj)
+        self.assertIn("c2", ct_obj)
+        self.assertNotIn("u", ct_obj)
+        self.assertNotIn("v", ct_obj)
+
     def test_encrypt_requires_32_byte_message(self):
         pk, _ = kyber_pke_keygen("ML-KEM-768")
         with self.assertRaises(ValueError):
