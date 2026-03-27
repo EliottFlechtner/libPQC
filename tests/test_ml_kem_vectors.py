@@ -39,6 +39,23 @@ class TestMlKemExpandMatrixA(unittest.TestCase):
             _ = expand_matrix_a(b"short", self.ring, self.k)
         with self.assertRaises(TypeError):
             _ = expand_matrix_a(self.rho, "bad", self.k)  # type: ignore[arg-type]
+
+        class NoDegree:
+            def polynomial(self, _coeffs):
+                return _coeffs
+
+        with self.assertRaises(TypeError):
+            _ = expand_matrix_a(self.rho, NoDegree(), self.k)  # type: ignore[arg-type]
+
+        class NoCoefficientRing:
+            degree = 256
+
+            def polynomial(self, _coeffs):
+                return _coeffs
+
+        with self.assertRaises(TypeError):
+            _ = expand_matrix_a(self.rho, NoCoefficientRing(), self.k)  # type: ignore[arg-type]
+
         with self.assertRaises(ValueError):
             _ = expand_matrix_a(self.rho, self.ring, 0)
 
