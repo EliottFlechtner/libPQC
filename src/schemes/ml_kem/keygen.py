@@ -13,8 +13,8 @@ The ML-KEM KEM layer will provide:
 
 The KEM layer will use the Kyber-PKE primitives from kyber_pke.py:
 - kyber_pke_keygen(params) -> (pk, sk)
-- kyber_pke_encrypt(pk, m, params, coins) -> ct
-- kyber_pke_decrypt(ct, sk, params) -> m
+- kyber_pke_encryption(pk, m, params, coins) -> ct
+- kyber_pke_decryption(ct, sk, params) -> m
 
 Domain separation ensures that encapsulation coins and key derivation are
 properly isolated from the underlying PKE layer.
@@ -23,8 +23,6 @@ properly isolated from the underlying PKE layer.
 # Temporary re-exports from kyber_pke for backward compatibility during transition
 from .kyber_pke import (
     kyber_pke_keygen,
-    kyber_pke_encrypt,
-    kyber_pke_decrypt,
     kyber_pke_encryption,
     kyber_pke_decryption,
     keygen,  # temporary alias
@@ -32,8 +30,6 @@ from .kyber_pke import (
 
 __all__ = [
     "kyber_pke_keygen",
-    "kyber_pke_encrypt",
-    "kyber_pke_decrypt",
     "kyber_pke_encryption",
     "kyber_pke_decryption",
     "keygen",

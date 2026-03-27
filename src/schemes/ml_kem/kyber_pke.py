@@ -143,8 +143,8 @@ Where:
 
   from src.schemes.ml_kem.kyber_pke import (
       kyber_pke_keygen,
-      kyber_pke_encrypt,
-      kyber_pke_decrypt,
+      kyber_pke_encryption,
+      kyber_pke_decryption,
   )
 
   # Generate keypair
@@ -153,10 +153,10 @@ Where:
   # Encrypt a 32-byte message with deterministic coins
   message = b"0" * 32
   coins = b"coins" * (32 // 5 + 1)  # ensure 32 bytes
-  ciphertext = kyber_pke_encrypt(pk, message, "ML-KEM-768", coins=coins)
+    ciphertext = kyber_pke_encryption(pk, message, "ML-KEM-768", coins=coins)
 
   # Decrypt
-  recovered = kyber_pke_decrypt(ciphertext, sk, "ML-KEM-768")
+    recovered = kyber_pke_decryption(ciphertext, sk, "ML-KEM-768")
   assert recovered == message
 
 === DESIGN NOTES ===
@@ -207,8 +207,8 @@ def kyber_pke_keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
     Returns:
         tuple: (public_key_bytes, secret_key_bytes)
                Both in JSON UTF-8 format for transport or storage.
-               Use kyber_pke_encrypt(public_key, ...) to encrypt.
-               Use kyber_pke_decrypt(..., secret_key) to decrypt.
+               Use kyber_pke_encryption(public_key, ...) to encrypt.
+               Use kyber_pke_decryption(..., secret_key) to decrypt.
 
     Raises:
         ValueError: If parameter preset does not exist or params dict missing required keys.
@@ -285,7 +285,7 @@ def kyber_pke_keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
     return public_key, secret_key
 
 
-def kyber_pke_encrypt(
+def kyber_pke_encryption(
     public_key: bytes,
     message: bytes,
     params: Dict[str, Any] | str,
@@ -318,7 +318,7 @@ def kyber_pke_encrypt(
                for testing or reproducibility.
 
     Returns:
-        bytes: Ciphertext serialized as JSON UTF-8 bytes. Use kyber_pke_decrypt(...)
+        bytes: Ciphertext serialized as JSON UTF-8 bytes. Use kyber_pke_decryption(...)
                to recover the message.
 
     Raises:
@@ -329,7 +329,7 @@ def kyber_pke_encrypt(
     Example:
         >>> pk, sk = kyber_pke_keygen("ML-KEM-768")
         >>> msg = b"0" * 32
-        >>> ct = kyber_pke_encrypt(pk, msg, "ML-KEM-768")
+        >>> ct = kyber_pke_encryption(pk, msg, "ML-KEM-768")
         >>> isinstance(ct, bytes)
         True
     """
@@ -429,7 +429,7 @@ def kyber_pke_encrypt(
     return serialization.to_bytes(ciphertext_payload)
 
 
-def kyber_pke_decrypt(
+def kyber_pke_decryption(
     ciphertext: bytes, secret_key: bytes, params: Dict[str, Any] | str
 ) -> bytes:
     """Decrypt a Kyber-PKE ciphertext into a 32-byte message.
@@ -449,7 +449,7 @@ def kyber_pke_decrypt(
     (has small norm in R_q), so nearest-neighbor rounding recovers the correct bits.
 
     Args:
-        ciphertext: Ciphertext bytes returned from kyber_pke_encrypt(...).
+        ciphertext: Ciphertext bytes returned from kyber_pke_encryption(...).
         secret_key: Secret key bytes returned from kyber_pke_keygen(...).
         params: Parameter preset name or dict (must match the keygen/encryption parameters).
 
@@ -465,8 +465,8 @@ def kyber_pke_decrypt(
     Example:
         >>> pk, sk = kyber_pke_keygen("ML-KEM-768")
         >>> msg = b"0" * 32
-        >>> ct = kyber_pke_encrypt(pk, msg, "ML-KEM-768")
-        >>> recovered = kyber_pke_decrypt(ct, sk, "ML-KEM-768")
+        >>> ct = kyber_pke_encryption(pk, msg, "ML-KEM-768")
+        >>> recovered = kyber_pke_decryption(ct, sk, "ML-KEM-768")
         >>> recovered == msg
         True
     """
@@ -525,39 +525,12 @@ def kyber_pke_decrypt(
     return poly_to_message(m_poly)
 
 
-def kyber_pke_encryption(
-    key: bytes,
-    message: bytes,
-    params: Dict[str, Any] | str,
-    coins: bytes | None = None,
-) -> bytes:
-    """Backward-compatible alias for kyber_pke_encrypt.
-
-    Provided for compatibility with earlier function naming conventions.
-    Internally delegates to kyber_pke_encrypt(...).
-    """
-    return kyber_pke_encrypt(key, message, params=params, coins=coins)
-
-
-def kyber_pke_decryption(
-    ciphertext: bytes, secret_key: bytes, params: Dict[str, Any] | str
-) -> bytes:
-    """Backward-compatible alias for kyber_pke_decrypt.
-
-    Provided for compatibility with earlier function naming conventions.
-    Internally delegates to kyber_pke_decrypt(...).
-    """
-    return kyber_pke_decrypt(ciphertext, secret_key, params=params)
-
-
 # Kept as an alias for compatibility with existing tests/imports.
 keygen = kyber_pke_keygen
 
 
 __all__ = [
     "kyber_pke_keygen",
-    "kyber_pke_encrypt",
-    "kyber_pke_decrypt",
     "kyber_pke_encryption",
     "kyber_pke_decryption",
     "keygen",

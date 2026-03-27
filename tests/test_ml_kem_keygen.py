@@ -2,8 +2,8 @@ import unittest
 
 from src.core.serialization import from_bytes
 from src.schemes.ml_kem.kyber_pke import (
-    kyber_pke_decrypt,
-    kyber_pke_encrypt,
+    kyber_pke_decryption,
+    kyber_pke_encryption,
     kyber_pke_keygen,
 )
 from src.schemes.ml_kem.params import ML_KEM_512, ML_KEM_768, ML_KEM_1024
@@ -75,19 +75,19 @@ class TestMlKemKeygen(unittest.TestCase):
     def test_encrypt_decrypt_roundtrip(self):
         pk, sk = kyber_pke_keygen("ML-KEM-768")
         message = bytes(range(32))
-        ciphertext = kyber_pke_encrypt(
+        ciphertext = kyber_pke_encryption(
             pk,
             message,
             params="ML-KEM-768",
             coins=b"c" * 32,
         )
-        recovered = kyber_pke_decrypt(ciphertext, sk, params="ML-KEM-768")
+        recovered = kyber_pke_decryption(ciphertext, sk, params="ML-KEM-768")
         self.assertEqual(recovered, message)
 
     def test_encrypt_requires_32_byte_message(self):
         pk, _ = kyber_pke_keygen("ML-KEM-768")
         with self.assertRaises(ValueError):
-            _ = kyber_pke_encrypt(pk, b"short", params="ML-KEM-768")
+            _ = kyber_pke_encryption(pk, b"short", params="ML-KEM-768")
 
 
 if __name__ == "__main__":
