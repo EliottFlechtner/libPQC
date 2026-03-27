@@ -1,17 +1,155 @@
-"""Utility functions for Kyber-PKE encoding, parameter handling, and rounding.
+"""Utility functions for Kyber-PKE encoding, parameter handling, rounding, and compression.
 
 This module contains reusable helpers for message encoding/decoding, parameter
 resolution and validation, and cyclic distance calculations used in
 encryption/decryption and key generation.
 """
 
-from src.core import polynomials, serialization
+from src.core import polynomials, module
 from .params import ML_KEM_PARAM_SETS
 from typing import Dict, Any
 
 
 REQUIRED_PARAMS = ("q", "n", "k", "eta1", "eta2", "du", "dv")
 PKE_MESSAGE_BYTES = 32
+
+
+def compress_coefficient(value: int, q: int, bits: int) -> int:
+    """Compress one coefficient from Z_q to an integer in [0, 2^bits).
+
+    Uses the Kyber quantization rule with nearest-integer rounding.
+    """
+    if bits <= 0:
+        raise ValueError("bits must be positive")
+    scale = 1 << bits
+    return ((int(value) % q) * scale + (q // 2)) // q % scale
+
+
+def decompress_coefficient(value: int, q: int, bits: int) -> int:
+    """Decompress one quantized coefficient back into Z_q."""
+    if bits <= 0:
+        raise ValueError("bits must be positive")
+    scale = 1 << bits
+    return ((int(value) % scale) * q + (scale // 2)) // scale % q
+
+
+def compress_polynomial(poly: polynomials.QuotientPolynomial, bits: int) -> dict:
+    """Compress a quotient polynomial coefficient-wise to a JSON-friendly payload."""
+    q = poly.ring.modulus
+    degree = poly.degree
+    coeffs = poly.to_coefficients(degree)
+    return {
+        "version": 1,
+        "type": "ml_kem_compressed_polynomial",
+        "modulus": q,
+        "degree": degree,
+        "bits": bits,
+        "coefficients": [compress_coefficient(c, q, bits) for c in coeffs],
+    }
+
+
+def decompress_polynomial(
+    payload: dict,
+    ring: polynomials.QuotientPolynomialRing,
+    expected_bits: int | None = None,
+):
+    """Decompress a polynomial payload into a QuotientPolynomial in ``ring``."""
+    if not isinstance(payload, dict):
+        raise TypeError("payload must be a dictionary")
+    if payload.get("type") != "ml_kem_compressed_polynomial":
+        raise ValueError("invalid compressed polynomial payload type")
+
+    bits = payload.get("bits")
+    if not isinstance(bits, int):
+        raise ValueError("compressed polynomial payload missing bits")
+    if expected_bits is not None and bits != expected_bits:
+        raise ValueError("compressed polynomial bits do not match parameter set")
+
+    if payload.get("modulus") != ring.coefficient_ring.modulus:
+        raise ValueError("compressed polynomial modulus mismatch")
+    if payload.get("degree") != ring.degree:
+        raise ValueError("compressed polynomial degree mismatch")
+
+    coeffs = payload.get("coefficients")
+    if not isinstance(coeffs, list):
+        raise TypeError("compressed polynomial coefficients must be a list")
+    if len(coeffs) != ring.degree:
+        raise ValueError("compressed polynomial coefficient length mismatch")
+
+    return ring.polynomial(
+        [decompress_coefficient(c, ring.coefficient_ring.modulus, bits) for c in coeffs]
+    )
+
+
+def compress_module_element(element: module.ModuleElement, bits: int) -> dict:
+    """Compress a module element coefficient-wise to a JSON-friendly payload."""
+    qring = element.module.quotient_ring
+    q = qring.coefficient_ring.modulus
+    degree = qring.degree
+
+    compressed_entries = []
+    for entry in element.entries:
+        coeffs = entry.to_coefficients(degree)
+        compressed_entries.append([compress_coefficient(c, q, bits) for c in coeffs])
+
+    return {
+        "version": 1,
+        "type": "ml_kem_compressed_module_element",
+        "modulus": q,
+        "degree": degree,
+        "rank": element.module.rank,
+        "bits": bits,
+        "entries": compressed_entries,
+    }
+
+
+def decompress_module_element(
+    payload: dict,
+    target_module: module.Module,
+    expected_bits: int | None = None,
+):
+    """Decompress a module-element payload into a ModuleElement in ``target_module``."""
+    if not isinstance(payload, dict):
+        raise TypeError("payload must be a dictionary")
+    if payload.get("type") != "ml_kem_compressed_module_element":
+        raise ValueError("invalid compressed module element payload type")
+
+    bits = payload.get("bits")
+    if not isinstance(bits, int):
+        raise ValueError("compressed module element payload missing bits")
+    if expected_bits is not None and bits != expected_bits:
+        raise ValueError("compressed module element bits do not match parameter set")
+
+    qring = target_module.quotient_ring
+    if payload.get("modulus") != qring.coefficient_ring.modulus:
+        raise ValueError("compressed module element modulus mismatch")
+    if payload.get("degree") != qring.degree:
+        raise ValueError("compressed module element degree mismatch")
+    if payload.get("rank") != target_module.rank:
+        raise ValueError("compressed module element rank mismatch")
+
+    entries = payload.get("entries")
+    if not isinstance(entries, list):
+        raise TypeError("compressed module element entries must be a list")
+    if len(entries) != target_module.rank:
+        raise ValueError("compressed module element entry count mismatch")
+
+    decompressed_entries = []
+    for coeffs in entries:
+        if not isinstance(coeffs, list):
+            raise TypeError(
+                "compressed module element entry must be a coefficient list"
+            )
+        if len(coeffs) != qring.degree:
+            raise ValueError("compressed module element coefficient length mismatch")
+        decompressed_entries.append(
+            [
+                decompress_coefficient(c, qring.coefficient_ring.modulus, bits)
+                for c in coeffs
+            ]
+        )
+
+    return target_module.element(decompressed_entries)
 
 
 def resolve_params(params: Dict[str, Any] | str) -> Dict[str, Any]:
@@ -252,6 +390,12 @@ __all__ = [
     "message_to_poly",
     "cyclic_distance",
     "poly_to_message",
+    "compress_coefficient",
+    "decompress_coefficient",
+    "compress_polynomial",
+    "decompress_polynomial",
+    "compress_module_element",
+    "decompress_module_element",
     "REQUIRED_PARAMS",
     "PKE_MESSAGE_BYTES",
 ]

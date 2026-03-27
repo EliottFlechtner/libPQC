@@ -32,7 +32,7 @@ store rho (32 bytes) plus the compressed t vector.
 === ALGORITHM: ENCRYPTION ===
 
 Input: public key (rho, t from JSON), 32-byte message m, optional 32-byte coins
-Output: ciphertext (u, v as JSON)
+Output: ciphertext (compressed c1, c2 as JSON)
 
 1. Expand matrix A from public seed rho using same SHAKE128 + rejection sampling.
 2. If coins is None, generate random 32-byte coins; otherwise validate coins is 32 bytes.
@@ -40,27 +40,31 @@ Output: ciphertext (u, v as JSON)
 4. Sample ephemeral secret r ∈ S_{eta1}^k from centered binomial distribution.
 5. Sample ephemeral errors e1 ∈ S_{eta2}^k and e2 ∈ S_{eta2} from CBD.
 6. Encode message m into polynomial m_poly with bit embedding in R_q coefficients.
-7. Compute ciphertext components:
+7. Compute uncompressed ciphertext components:
    u = A^T · r + e1  (k-dimensional vector in R_q)
    v = t^T · r + e2 + m_poly  (single polynomial in R_q)
-8. Serialize and return as JSON: {u as module element, v as polynomial}
+8. Compress ciphertext components:
+    c1 = Compress(u, du), c2 = Compress(v, dv)
+9. Serialize and return as JSON: {c1, c2}
 
 The encryption is deterministic given fixed coins; if coins is None, random coins are used.
 
 === ALGORITHM: DECRYPTION ===
 
-Input: ciphertext (u, v from JSON), secret key s (from JSON), params
+Input: ciphertext (c1, c2 from JSON), secret key s (from JSON), params
 Output: 32-byte message m
 
-1. Parse ciphertext components u (k-dimensional) and v (polynomial) from JSON.
-2. Parse secret key s (k-dimensional vector) from JSON.
-3. Compute decryption polynomial:
-   m_poly = v - s^T · u  (inner product: sum of s_j * u_j)
-4. Decode m_poly back to 32 bytes by nearest-neighbor rounding:
+1. Parse compressed ciphertext components c1 and c2 from JSON.
+2. Decompress to recover approximate ring elements:
+    u' = Decompress(c1, du), v' = Decompress(c2, dv)
+3. Parse secret key s (k-dimensional vector) from JSON.
+4. Compute decryption polynomial:
+    m_poly = v' - s^T · u'  (inner product: sum of s_j * u_j)
+5. Decode m_poly back to 32 bytes by nearest-neighbor rounding:
    - For each of 256 bit positions (coefficients 0..255), round to nearest representative.
    - Compute cyclic distance from coefficient to 0 and to (q+1)/2 in Z_q.
    - Bit is 1 if closer to (q+1)/2, otherwise 0.
-5. Assemble 256 bits into 32-byte message and return.
+6. Assemble 256 bits into 32-byte message and return.
 
 Decryption correctness holds because the error term (e2 - e1^T · r) in R_q is bounded
 with small infinity norm; nearest-neighbor rounding recovers the correct bits.
@@ -105,8 +109,8 @@ Ciphertext JSON:
     "version": 1,
     "type": "ml_kem_pke_ciphertext",
     "params": "ML-KEM-768",
-    "u": { ... },            # module_element_to_dict(u) serialization of u vector
-    "v": { ... }             # polynomial_to_dict(v) serialization of polynomial
+        "c1": { ... },           # compressed u payload (module element coefficients)
+        "c2": { ... }            # compressed v payload (polynomial coefficients)
   }
 
 === PARAMETER SETS AND THEIR MEANINGS ===
@@ -180,6 +184,10 @@ from .pke_utils import (
     validate_params,
     message_to_poly,
     poly_to_message,
+    compress_module_element,
+    decompress_module_element,
+    compress_polynomial,
+    decompress_polynomial,
 )
 from typing import Dict, Any, Tuple
 
@@ -300,10 +308,12 @@ def kyber_pke_encryption(
     3. Sample ephemeral secret r ∈ S_eta1^k from centered binomial, seeded by coins.
     4. Sample ephemeral errors e1 ∈ S_eta2^k and e2 ∈ S_eta2 (scalar) similarly seeded.
     5. Encode the 32-byte message into polynomial m_poly using bit embedding.
-    6. Compute ciphertext components:
+     6. Compute uncompressed ciphertext components:
        u = A^T·r + e1 ∈ R_q^k  (matrix-vector product)
        v = t^T·r + e2 + m_poly ∈ R_q  (polynomial)
-    7. Serialize and return as JSON-encoded ciphertext bytes.
+     7. Compress with parameter-set bit-widths:
+         c1 = Compress(u, du), c2 = Compress(v, dv)
+     8. Serialize and return as JSON-encoded ciphertext bytes.
 
     Encryption is deterministic given fixed coins; if coins is None, random 32-byte
     coins are generated automatically.
@@ -342,6 +352,8 @@ def kyber_pke_encryption(
     k = resolved["k"]
     eta1 = resolved["eta1"]  # used for ephemeral secret r sampling
     eta2 = resolved["eta2"]  # used for ephemeral error e1, e2 sampling
+    du = resolved["du"]  # ciphertext compression bits for u
+    dv = resolved["dv"]  # ciphertext compression bits for v
     param_name = resolved.get("name", "custom")
 
     # Validate message size matches expected 32-byte format
@@ -418,13 +430,17 @@ def kyber_pke_encryption(
     for j in range(k):
         v = v + (t.entries[j] * r.entries[j])  # accumulate t^T * r = sum_j t_j * r_j
 
-    # Step 7: Serialize ciphertext components as JSON
+    # Step 7: Compress ciphertext components to drop low-order coefficient bits.
+    c1 = compress_module_element(u, du)
+    c2 = compress_polynomial(v, dv)
+
+    # Step 8: Serialize compressed ciphertext payload as JSON.
     ciphertext_payload = {
         "version": 1,
         "type": "ml_kem_pke_ciphertext",
         "params": param_name,
-        "u": serialization.module_element_to_dict(u),  # serialize u vector
-        "v": serialization.polynomial_to_dict(v),  # serialize v polynomial
+        "c1": c1,
+        "c2": c2,
     }
     return serialization.to_bytes(ciphertext_payload)
 
@@ -436,14 +452,15 @@ def kyber_pke_decryption(
 
     Implements the Kyber-PKE.Dec algorithm as standardized in NIST FIPS 203:
 
-    1. Parse the ciphertext to extract components u (vector) and v (polynomial).
-    2. Parse the secret key to extract secret vector s.
-    3. Compute the decryption polynomial:
-       m_poly = v - s^T·u ∈ R_q
+     1. Parse the ciphertext to extract compressed components c1 and c2.
+     2. Decompress to approximate ring elements u' and v'.
+     3. Parse the secret key to extract secret vector s.
+     4. Compute the decryption polynomial:
+         m_poly = v' - s^T·u' ∈ R_q
        (where s^T·u is the inner product of s and u)
-    4. Decode m_poly back into a 32-byte message using nearest-neighbor rounding:
+     5. Decode m_poly back into a 32-byte message using nearest-neighbor rounding:
        Each coefficient is rounded to the nearest representative among {0, (q+1)/2}.
-    5. Return the recovered message.
+     6. Return the recovered message.
 
     The decryption correctness holds because the error term e2 - e1^T·r is bounded
     (has small norm in R_q), so nearest-neighbor rounding recovers the correct bits.
@@ -476,6 +493,8 @@ def kyber_pke_decryption(
     q = resolved["q"]
     n = resolved["n"]
     k = resolved["k"]
+    du = resolved["du"]
+    dv = resolved["dv"]
 
     # Validate message size matches expected 32-byte format
     if n != 256:  # PKE message encoding expects 256 coefficients = 32 bytes
@@ -491,24 +510,34 @@ def kyber_pke_decryption(
     if sk_payload.get("type") != "ml_kem_pke_secret_key":
         raise ValueError("invalid secret key payload type")
 
-    # Extract ciphertext components (u, v) and secret key component (s)
+    # Extract ciphertext components and secret key component (s)
+    c1_payload = ct_payload.get("c1")
+    c2_payload = ct_payload.get("c2")
     u_payload = ct_payload.get("u")
     v_payload = ct_payload.get("v")
     s_payload = sk_payload.get("s")
-    if not isinstance(u_payload, dict) or not isinstance(v_payload, dict):
-        raise ValueError("ciphertext payload must include u and v")
+
+    has_compressed_ct = isinstance(c1_payload, dict) and isinstance(c2_payload, dict)
+    has_legacy_ct = isinstance(u_payload, dict) and isinstance(v_payload, dict)
+    if not has_compressed_ct and not has_legacy_ct:
+        raise ValueError("ciphertext payload must include c1/c2 or legacy u/v")
     if not isinstance(s_payload, dict):
         raise ValueError("secret key payload must include s")
-
-    # Deserialize module/polynomial elements from JSON
-    u = serialization.module_element_from_dict(u_payload)
-    v = serialization.polynomial_from_dict(v_payload)
-    s = serialization.module_element_from_dict(s_payload)
 
     # Create the quotient ring for arithmetic operations
     zq = integers.IntegersRing(q)
     rq = polynomials.QuotientPolynomialRing(zq, degree=n)
-    _ = module.Module(rq, rank=k)
+    rq_module_k = module.Module(rq, rank=k)
+
+    # Deserialize/decompress ciphertext components and deserialize secret key.
+    if has_compressed_ct:
+        u = decompress_module_element(c1_payload, rq_module_k, expected_bits=du)
+        v = decompress_polynomial(c2_payload, rq, expected_bits=dv)
+    else:
+        u = serialization.module_element_from_dict(u_payload)
+        v = serialization.polynomial_from_dict(v_payload)
+
+    s = serialization.module_element_from_dict(s_payload)
 
     # Validate ciphertext/secret key ranks match parameter set
     if u.module.rank != k or s.module.rank != k:
