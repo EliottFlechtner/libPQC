@@ -1,8 +1,8 @@
 """Quick Kyber-PKE encrypt/decrypt demo."""
 
-from src.schemes.ml_kem.keygen import (
-    kyber_pke_decrypt,
-    kyber_pke_encrypt,
+from src.schemes.ml_kem.kyber_pke import (
+    kyber_pke_decryption,
+    kyber_pke_encryption,
     kyber_pke_keygen,
 )
 
@@ -18,7 +18,7 @@ def main() -> None:
     if len(message) != 32:
         raise ValueError("demo message must be exactly 32 bytes")
 
-    ciphertext = kyber_pke_encrypt(
+    ciphertext = kyber_pke_encryption(
         public_key,
         message,
         params=params,
@@ -26,7 +26,7 @@ def main() -> None:
     )
 
     # 3) Decrypt and verify
-    recovered = kyber_pke_decrypt(ciphertext, secret_key, params=params)
+    recovered = kyber_pke_decryption(ciphertext, secret_key, params=params)
 
     print("Original:", message.hex())
     print("Recovered:", recovered.hex())
