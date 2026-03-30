@@ -1,6 +1,7 @@
 import unittest
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -71,6 +72,10 @@ class TestPolynomial(unittest.TestCase):
         self.assertEqual(str(p2), "1")
         p3 = Polynomial([0, 1], self.Z5)
         self.assertEqual(str(p3), "x")
+
+    def test_str_degree_two_unit_coeff(self):
+        p = Polynomial([0, 0, 1], self.Z5)
+        self.assertEqual(str(p), "x^2")
 
     def test_call_evaluate(self):
         """Test polynomial evaluation."""
@@ -148,6 +153,7 @@ class TestPolynomial(unittest.TestCase):
         self.assertEqual(p1, p2)
         self.assertIn("Polynomial(coefficients=", repr(p1))
         self.assertFalse(p1.is_zero())
+        self.assertTrue(Polynomial([0], self.Z5).is_zero())
         self.assertEqual(p1.to_coefficients(4), [1, 2, 0, 0])
         self.assertEqual(p1.copy(), p1)
 
@@ -272,6 +278,14 @@ class TestQuotientPolynomial(unittest.TestCase):
         p = QuotientPolynomial([1, 2, 3], self.Z5, degree=4)
         self.assertEqual(str(p), "3x^2 + 2x + 1")
 
+    def test_str_linear_unit_coefficient(self):
+        p = QuotientPolynomial([0, 1], self.Z5, degree=4)
+        self.assertEqual(str(p), "x")
+
+    def test_str_degree_two_unit_coeff(self):
+        p = QuotientPolynomial([0, 0, 1], self.Z5, degree=4)
+        self.assertEqual(str(p), "x^2")
+
     def test_call_evaluate(self):
         """Test polynomial evaluation."""
         p = QuotientPolynomial([1, 2, 3], self.Z5, degree=4)
@@ -335,6 +349,20 @@ class TestQuotientPolynomial(unittest.TestCase):
         self.assertLessEqual(len(result.coefficients), 3)
         # Verify all coefficients are in Z_5
         self.assertTrue(all(c < 5 for c in result.coefficients))
+
+    def test_mul_falls_back_when_ntt_raises(self):
+        p1 = QuotientPolynomial([1, 2, 3, 4], self.Z5, degree=4)
+        p2 = QuotientPolynomial([4, 3, 2, 1], self.Z5, degree=4)
+
+        with patch(
+            "src.core.polynomials.supports_negacyclic_ntt", return_value=True
+        ), patch(
+            "src.core.polynomials.negacyclic_convolution_ntt",
+            side_effect=ValueError("forced fallback"),
+        ):
+            result = p1 * p2
+
+        self.assertIsInstance(result, QuotientPolynomial)
 
     def test_mul_same_ring_required(self):
         """Test that multiplication requires same ring and degree."""

@@ -4,7 +4,10 @@ from src.core.integers import IntegersRing
 from src.core.module import Module
 from src.core.polynomials import Polynomial, QuotientPolynomialRing
 from src.core.sampling import (
+    derive_seed,
+    generate_mlkem_keygen_seeds,
     make_deterministic_rng,
+    random_seed,
     sample_centered_binomial_coefficients,
     sample_small_coefficients,
     sample_small_matrix,
@@ -43,6 +46,63 @@ class TestSamplingUtilities(unittest.TestCase):
         r1 = make_deterministic_rng(b"seed")
         r2 = make_deterministic_rng(b"seed")
         self.assertEqual(r1.randrange(1000), r2.randrange(1000))
+
+    def test_random_seed_default_and_validation(self):
+        seed = random_seed()
+        self.assertIsInstance(seed, bytes)
+        self.assertEqual(len(seed), 32)
+
+        with self.assertRaises(TypeError):
+            _ = random_seed("32")
+        with self.assertRaises(ValueError):
+            _ = random_seed(0)
+
+    def test_derive_seed_deterministic_and_domain_separated(self):
+        master = b"m" * 32
+        r1 = derive_seed(master, "rho")
+        r2 = derive_seed(master, "rho")
+        s = derive_seed(master, "s")
+        self.assertEqual(r1, r2)
+        self.assertNotEqual(r1, s)
+        self.assertEqual(len(r1), 32)
+
+    def test_derive_seed_validation(self):
+        with self.assertRaises(TypeError):
+            _ = derive_seed("bad", "rho")
+        with self.assertRaises(ValueError):
+            _ = derive_seed(b"", "rho")
+        with self.assertRaises(TypeError):
+            _ = derive_seed(b"x", 123)
+        with self.assertRaises(TypeError):
+            _ = derive_seed(b"x", "rho", num_bytes="32")  # type: ignore[arg-type]
+        with self.assertRaises(ValueError):
+            _ = derive_seed(b"x", "rho", num_bytes=0)
+        # Exercise bytes-like label coercion path.
+        self.assertEqual(len(derive_seed(b"x", b"rho", num_bytes=16)), 16)
+        with self.assertRaises(ValueError):
+            _ = derive_seed(b"x", "")
+
+    def test_generate_mlkem_keygen_seeds(self):
+        # Exercise default random master-seed path.
+        seeds_default = generate_mlkem_keygen_seeds()
+        self.assertEqual(len(seeds_default["master_seed"]), 32)
+
+        master = b"k" * 32
+        seeds_1 = generate_mlkem_keygen_seeds(master)
+        seeds_2 = generate_mlkem_keygen_seeds(master)
+
+        for key in ("master_seed", "rho", "s_seed", "e_seed", "pk_seed"):
+            self.assertIn(key, seeds_1)
+            self.assertEqual(len(seeds_1[key]), 32)
+
+        self.assertEqual(seeds_1, seeds_2)
+        self.assertNotEqual(seeds_1["rho"], seeds_1["s_seed"])
+        self.assertNotEqual(seeds_1["s_seed"], seeds_1["e_seed"])
+
+        with self.assertRaises(TypeError):
+            _ = generate_mlkem_keygen_seeds("bad")
+        with self.assertRaises(ValueError):
+            _ = generate_mlkem_keygen_seeds(b"")
 
     def test_uniform_vector_shape(self):
         v = sample_uniform_vector(self.module, rng=make_deterministic_rng(1))

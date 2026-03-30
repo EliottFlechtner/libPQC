@@ -45,6 +45,10 @@ class TestModule(unittest.TestCase):
         self.assertFalse(v.is_zero())
         self.assertEqual(v.copy(), v)
 
+    def test_element_is_zero_true_case(self):
+        z = self.M2.zero()
+        self.assertTrue(z.is_zero())
+
     def test_element_init_type_errors(self):
         with self.assertRaises(TypeError):
             _ = ModuleElement("not-module", [1, 2])

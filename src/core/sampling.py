@@ -6,10 +6,14 @@ sampling helpers for coefficients and quotient polynomials.
 
 import random
 import secrets
+from hashlib import shake_256
 from typing import Optional
 
 from .module import Module, ModuleElement
 from .polynomials import QuotientPolynomial, QuotientPolynomialRing
+
+
+DEFAULT_SEED_BYTES = 32
 
 
 def _resolve_rng(rng: Optional[random.Random]) -> random.Random:
@@ -24,6 +28,88 @@ def make_deterministic_rng(seed: int | str | bytes) -> random.Random:
     else:
         seed_value = seed
     return random.Random(seed_value)
+
+
+def random_seed(num_bytes: int = DEFAULT_SEED_BYTES) -> bytes:
+    """Return cryptographically secure random seed bytes.
+
+    Args:
+        num_bytes: Number of bytes to generate. Defaults to 32 (256 bits).
+    """
+    if not isinstance(num_bytes, int):
+        raise TypeError("num_bytes must be an integer")
+    if num_bytes <= 0:
+        raise ValueError("num_bytes must be positive")
+    return secrets.token_bytes(num_bytes)
+
+
+def derive_seed(
+    seed_material: bytes, label: str | bytes, num_bytes: int = DEFAULT_SEED_BYTES
+) -> bytes:
+    """Derive domain-separated seed bytes from seed material.
+
+    Uses SHAKE-256 to deterministically derive independent sub-seeds.
+
+    Args:
+        seed_material: Base entropy as bytes.
+        label: Domain-separation label (e.g. ``"rho"``, ``"s"``, ``"e"``).
+        num_bytes: Output size in bytes. Defaults to 32 (256 bits).
+    """
+    if not isinstance(seed_material, (bytes, bytearray)):
+        raise TypeError("seed_material must be bytes-like")
+    if len(seed_material) == 0:
+        raise ValueError("seed_material must not be empty")
+    if not isinstance(label, (str, bytes, bytearray)):
+        raise TypeError("label must be str or bytes-like")
+    if not isinstance(num_bytes, int):
+        raise TypeError("num_bytes must be an integer")
+    if num_bytes <= 0:
+        raise ValueError("num_bytes must be positive")
+
+    if isinstance(label, str):
+        label_bytes = label.encode("utf-8")
+    else:
+        label_bytes = bytes(label)
+
+    if len(label_bytes) == 0:
+        raise ValueError("label must not be empty")
+
+    return shake_256(bytes(seed_material) + b"|" + label_bytes).digest(num_bytes)
+
+
+def generate_mlkem_keygen_seeds(
+    master_seed: Optional[bytes] = None,
+) -> dict[str, bytes]:
+    """Generate ML-KEM-style domain-separated 256-bit keygen seeds.
+
+    Returns seeds for:
+    - ``rho``: public seed used for matrix A generation
+    - ``s_seed``: secret seed for secret vector sampling
+    - ``e_seed``: secret seed for error vector sampling
+    - ``pk_seed``: seed used for public-key related derivations/serialization
+    """
+    if master_seed is None:
+        master = random_seed(DEFAULT_SEED_BYTES)
+    else:
+        if not isinstance(master_seed, (bytes, bytearray)):
+            raise TypeError("master_seed must be bytes-like")
+        if len(master_seed) == 0:
+            raise ValueError("master_seed must not be empty")
+        master = bytes(master_seed)
+
+    rho = derive_seed(master, "mlkem-rho")
+    sigma = derive_seed(master, "mlkem-sigma")
+    s_seed = derive_seed(sigma, "mlkem-s")
+    e_seed = derive_seed(sigma, "mlkem-e")
+    pk_seed = derive_seed(master, "mlkem-pk")
+
+    return {
+        "master_seed": master,
+        "rho": rho,
+        "s_seed": s_seed,
+        "e_seed": e_seed,
+        "pk_seed": pk_seed,
+    }
 
 
 def sample_uniform_coefficients(
