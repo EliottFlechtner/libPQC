@@ -17,16 +17,14 @@ When `aseed` is provided, keygen randomness is made deterministic from `aseed`.
 """
 
 from contextlib import contextmanager
-from hashlib import sha3_256, sha3_512
 from typing import Any, Dict, Iterator, Tuple
 
 from src.core import sampling, serialization
 
-from .kyber_pke import (
-    kyber_pke_decryption,
-    kyber_pke_encryption,
-    kyber_pke_keygen,
-)
+from .kyber_pke import kyber_pke_keygen
+from .hashes import G, H, J
+
+MlKemParams = Dict[str, Any] | str
 
 
 def _to_seed_bytes(aseed: bytes | str) -> bytes:
@@ -39,21 +37,6 @@ def _to_seed_bytes(aseed: bytes | str) -> bytes:
     if not seed:
         raise ValueError("aseed must not be empty")
     return seed
-
-
-def G(data: bytes) -> bytes:
-    """Hash function G: `* -> 512 bits` (64 bytes)."""
-    return sha3_512(data).digest()
-
-
-def H(data: bytes) -> bytes:
-    """Hash function H: `* -> 256 bits` (32 bytes)."""
-    return sha3_256(b"H|" + data).digest()
-
-
-def J(data: bytes) -> bytes:
-    """Hash function J: `* -> 256 bits` (32 bytes)."""
-    return sha3_256(b"J|" + data).digest()
 
 
 def _deterministic_bytes(aseed: bytes, label: bytes, size: int) -> bytes:
@@ -89,7 +72,7 @@ def _patched_sampling_random_seed(aseed: bytes) -> Iterator[None]:
 
 
 def ml_kem_keygen(
-    params: Dict[str, Any] | str,
+    params: MlKemParams,
     aseed: bytes | str | None = None,
 ) -> Tuple[bytes, bytes]:
     """Generate ML-KEM encapsulation and decapsulation keys.
@@ -102,6 +85,10 @@ def ml_kem_keygen(
         tuple[bytes, bytes]: `(ek, dk)` where:
             - `ek = (rho, t)`
             - `dk = (s, ek, H(ek), z)`
+
+    Raises:
+        TypeError: If `aseed` is provided and is not bytes-like or string.
+        ValueError: If `aseed` is provided but empty.
     """
     if aseed is None:
         pke_public_key, pke_secret_key = kyber_pke_keygen(params)
@@ -137,17 +124,7 @@ def ml_kem_keygen(
     return ek, dk
 
 
-# Canonical ML-KEM keygen alias.
-keygen = ml_kem_keygen
-
-
 __all__ = [
-    "kyber_pke_keygen",
-    "kyber_pke_encryption",
-    "kyber_pke_decryption",
-    "G",
-    "H",
-    "J",
+    "MlKemParams",
     "ml_kem_keygen",
-    "keygen",
 ]

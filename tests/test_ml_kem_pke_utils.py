@@ -267,14 +267,12 @@ class TestMlKemPkeUtils(unittest.TestCase):
         self.assertEqual(recovered, message)
 
     def test_keygen_module_reexports(self):
-        self.assertIs(keygen_module.kyber_pke_keygen, kyber_pke_keygen)
-        self.assertIs(keygen_module.keygen, keygen_module.ml_kem_keygen)
-        self.assertIn("kyber_pke_keygen", keygen_module.__all__)
-        self.assertIn("kyber_pke_encryption", keygen_module.__all__)
-        self.assertIn("kyber_pke_decryption", keygen_module.__all__)
+        self.assertTrue(hasattr(keygen_module, "ml_kem_keygen"))
+        self.assertIn("ml_kem_keygen", keygen_module.__all__)
+        self.assertIn("MlKemParams", keygen_module.__all__)
 
     def test_ml_kem_keygen_fo_style_payload(self):
-        ek, dk = keygen_module.keygen("ML-KEM-768", aseed=b"a" * 32)
+        ek, dk = keygen_module.ml_kem_keygen("ML-KEM-768", aseed=b"a" * 32)
         ek_obj = from_bytes(ek)
         dk_obj = from_bytes(dk)
 
