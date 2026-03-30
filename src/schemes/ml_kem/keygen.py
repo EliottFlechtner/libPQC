@@ -1,36 +1,153 @@
-"""ML-KEM Key Encapsulation Mechanism (KEM) - Future Implementation.
+"""ML-KEM key generation using Kyber-PKE as the underlying building block.
 
-This module will implement the ML-KEM KEM layer, which composes the Kyber-PKE
-primitives with hash-based key derivation and domain separation for CCA-secure
-key encapsulation.
+This module implements a practical FO-style key packaging for ML-KEM keygen:
 
-CURRENT STATUS: Placeholder for future development.
+1. Generate Kyber-PKE keys: public key `(rho, t)` and secret key `s`.
+2. Sample `z in {0,1}^256`.
+3. Build:
+   - `ek = (rho, t)`
+   - `dk = (s, ek, H(ek), z)`
 
-The ML-KEM KEM layer will provide:
-- keygen(params) -> (ek, dk)  : Generate encapsulation/decapsulation keys
-- encaps(ek, params) -> (ss, ct)  : Encapsulate shared secret
-- decaps(ct, dk, params) -> ss  : Decapsulate to recover shared secret
+Hash interfaces used here:
+- `G: * -> 512 bits`
+- `H: * -> 256 bits`
+- `J: * -> 256 bits`
 
-The KEM layer will use the Kyber-PKE primitives from kyber_pke.py:
-- kyber_pke_keygen(params) -> (pk, sk)
-- kyber_pke_encryption(pk, m, params, coins) -> ct
-- kyber_pke_decryption(ct, sk, params) -> m
-
-Domain separation ensures that encapsulation coins and key derivation are
-properly isolated from the underlying PKE layer.
+When `aseed` is provided, keygen randomness is made deterministic from `aseed`.
 """
 
-# Temporary re-exports from kyber_pke for backward compatibility during transition
+from contextlib import contextmanager
+from hashlib import sha3_256, sha3_512
+from typing import Any, Dict, Iterator, Tuple
+
+from src.core import sampling, serialization
+
 from .kyber_pke import (
-    kyber_pke_keygen,
-    kyber_pke_encryption,
     kyber_pke_decryption,
-    keygen,  # temporary alias
+    kyber_pke_encryption,
+    kyber_pke_keygen,
 )
+
+
+def _to_seed_bytes(aseed: bytes | str) -> bytes:
+    if isinstance(aseed, str):
+        seed = aseed.encode("utf-8")
+    elif isinstance(aseed, (bytes, bytearray)):
+        seed = bytes(aseed)
+    else:
+        raise TypeError("aseed must be bytes-like or a string")
+    if not seed:
+        raise ValueError("aseed must not be empty")
+    return seed
+
+
+def G(data: bytes) -> bytes:
+    """Hash function G: `* -> 512 bits` (64 bytes)."""
+    return sha3_512(data).digest()
+
+
+def H(data: bytes) -> bytes:
+    """Hash function H: `* -> 256 bits` (32 bytes)."""
+    return sha3_256(b"H|" + data).digest()
+
+
+def J(data: bytes) -> bytes:
+    """Hash function J: `* -> 256 bits` (32 bytes)."""
+    return sha3_256(b"J|" + data).digest()
+
+
+def _deterministic_bytes(aseed: bytes, label: bytes, size: int) -> bytes:
+    """Expand deterministic bytes from `aseed` using domain separation."""
+    out = b""
+    counter = 0
+    while len(out) < size:
+        counter_bytes = counter.to_bytes(4, byteorder="big", signed=False)
+        out += G(b"ML-KEM|" + label + b"|" + aseed + b"|" + counter_bytes)
+        counter += 1
+    return out[:size]
+
+
+@contextmanager
+def _patched_sampling_random_seed(aseed: bytes) -> Iterator[None]:
+    """Temporarily patch sampling.random_seed for deterministic keygen entropy."""
+    original_random_seed = sampling.random_seed
+
+    def deterministic_random_seed(
+        num_bytes: int = sampling.DEFAULT_SEED_BYTES,
+    ) -> bytes:
+        if not isinstance(num_bytes, int):
+            raise TypeError("num_bytes must be an integer")
+        if num_bytes <= 0:
+            raise ValueError("num_bytes must be positive")
+        return _deterministic_bytes(aseed, b"random-seed", num_bytes)
+
+    sampling.random_seed = deterministic_random_seed
+    try:
+        yield
+    finally:
+        sampling.random_seed = original_random_seed
+
+
+def ml_kem_keygen(
+    params: Dict[str, Any] | str,
+    aseed: bytes | str | None = None,
+) -> Tuple[bytes, bytes]:
+    """Generate ML-KEM encapsulation and decapsulation keys.
+
+    Args:
+        params: ML-KEM parameter preset name or explicit parameter dictionary.
+        aseed: Optional seed material. If provided, randomness is deterministic.
+
+    Returns:
+        tuple[bytes, bytes]: `(ek, dk)` where:
+            - `ek = (rho, t)`
+            - `dk = (s, ek, H(ek), z)`
+    """
+    if aseed is None:
+        pke_public_key, pke_secret_key = kyber_pke_keygen(params)
+        z = sampling.random_seed(32)
+    else:
+        seed = _to_seed_bytes(aseed)
+        with _patched_sampling_random_seed(seed):
+            pke_public_key, pke_secret_key = kyber_pke_keygen(params)
+        z = J(b"ml-kem-z|" + seed)
+
+    pk_payload = serialization.from_bytes(pke_public_key)
+    sk_payload = serialization.from_bytes(pke_secret_key)
+
+    ek_payload = {
+        "version": 1,
+        "type": "ml_kem_encapsulation_key",
+        "params": pk_payload.get("params"),
+        "rho": pk_payload["rho"],
+        "t": pk_payload["t"],
+    }
+    ek = serialization.to_bytes(ek_payload)
+
+    dk_payload = {
+        "version": 1,
+        "type": "ml_kem_decapsulation_key",
+        "params": sk_payload.get("params"),
+        "s": sk_payload["s"],
+        "ek": ek_payload,
+        "h_ek": H(ek).hex(),
+        "z": z.hex(),
+    }
+    dk = serialization.to_bytes(dk_payload)
+    return ek, dk
+
+
+# Canonical ML-KEM keygen alias.
+keygen = ml_kem_keygen
+
 
 __all__ = [
     "kyber_pke_keygen",
     "kyber_pke_encryption",
     "kyber_pke_decryption",
+    "G",
+    "H",
+    "J",
+    "ml_kem_keygen",
     "keygen",
 ]
