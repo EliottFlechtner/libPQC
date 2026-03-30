@@ -22,10 +22,15 @@ Lattice-based post-quantum cryptography playground with an implementation-first 
   - deterministic matrix expansion helpers
   - ciphertext compression/decompression (`c1`/`c2` flow)
   - compatibility branch for legacy `u`/`v` ciphertext payloads during transition
+- ML-KEM KEM layer in `src/schemes/ml_kem`:
+  - `ml_kem_keygen`
+  - `ml_kem_encaps`
+  - `ml_kem_decaps`
+  - FO-style hash helpers (`G`, `H`, `J`)
 
 ## Current Scope
 
-This repository currently focuses on the PKE layer that underpins ML-KEM. The higher-level KEM wrapper (`encaps`/`decaps`) and some communication/experiment modules are scaffolded but intentionally minimal at this stage.
+This repository currently includes both the ML-KEM PKE building blocks and a working KEM wrapper (`keygen`/`encaps`/`decaps`) built from those primitives. Communication and experiment modules are still scaffolded.
 
 ## Project Layout
 
@@ -45,10 +50,11 @@ src/
       pke_utils.py
       vectors.py
       params.py
-      keygen.py         # compatibility re-exports
-      encaps.py         # placeholder
-      decaps.py         # placeholder
-      ml_kem.py         # placeholder
+      keygen.py         # KEM keygen (ek, dk packaging)
+      encaps.py         # KEM encapsulation
+      decaps.py         # KEM decapsulation
+      ml_kem.py         # canonical high-level exports
+      hashes.py         # G/H/J and K/R derivation
 
     ml_dsa/
       ...               # scaffolding
@@ -58,7 +64,13 @@ src/
   app/                  # scaffolding
 
 tests/
-  test_*.py
+  core/
+    test_*.py
+  schemes/
+    ml_kem/
+      test_*.py
+  integration/
+    test_*.py
 ```
 
 ## Quick Start
@@ -90,10 +102,28 @@ assert recovered == message
 
 ## Testing
 
-Run the full unit test suite:
+Run the full test suite (recursive discovery):
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_*.py'
+```
+
+Run only core math tests:
+
+```bash
+python3 -m unittest discover -s tests/core -p 'test_*.py'
+```
+
+Run only ML-KEM scheme tests:
+
+```bash
+python3 -m unittest discover -s tests/schemes/ml_kem -p 'test_*.py'
+```
+
+Run integration-style tests:
+
+```bash
+python3 -m unittest discover -s tests/integration -p 'test_*.py'
 ```
 
 ## Coverage
@@ -123,7 +153,6 @@ Useful outputs:
 
 ## Near-Term Roadmap
 
-- complete ML-KEM KEM layer (`encaps`/`decaps`) on top of existing PKE
 - tighten coverage around remaining branch-heavy paths
 - continue integrating scheme code with `comms` and `experiments` modules
 
