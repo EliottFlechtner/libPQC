@@ -73,10 +73,20 @@ class TestSamplingUtilities(unittest.TestCase):
             _ = derive_seed(b"", "rho")
         with self.assertRaises(TypeError):
             _ = derive_seed(b"x", 123)
+        with self.assertRaises(TypeError):
+            _ = derive_seed(b"x", "rho", num_bytes="32")  # type: ignore[arg-type]
+        with self.assertRaises(ValueError):
+            _ = derive_seed(b"x", "rho", num_bytes=0)
+        # Exercise bytes-like label coercion path.
+        self.assertEqual(len(derive_seed(b"x", b"rho", num_bytes=16)), 16)
         with self.assertRaises(ValueError):
             _ = derive_seed(b"x", "")
 
     def test_generate_mlkem_keygen_seeds(self):
+        # Exercise default random master-seed path.
+        seeds_default = generate_mlkem_keygen_seeds()
+        self.assertEqual(len(seeds_default["master_seed"]), 32)
+
         master = b"k" * 32
         seeds_1 = generate_mlkem_keygen_seeds(master)
         seeds_2 = generate_mlkem_keygen_seeds(master)

@@ -77,6 +77,11 @@ class TestMlKemPkeUtils(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = decompress_polynomial(bad_coeffs, self.rq)
 
+        bad_coeffs_type = dict(payload)
+        bad_coeffs_type["coefficients"] = "not-a-list"
+        with self.assertRaises(TypeError):
+            _ = decompress_polynomial(bad_coeffs_type, self.rq)
+
         bad_bits = dict(payload)
         bad_bits["bits"] = "10"
         with self.assertRaises(ValueError):
@@ -145,6 +150,11 @@ class TestMlKemPkeUtils(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = decompress_module_element(bad_entries, mod)
 
+        bad_entry_length = dict(payload)
+        bad_entry_length["entries"] = [[1] * (self.n - 1), [2] * self.n]
+        with self.assertRaises(ValueError):
+            _ = decompress_module_element(bad_entry_length, mod)
+
         bad_entries_type = dict(payload)
         bad_entries_type["entries"] = "not-a-list"
         with self.assertRaises(TypeError):
@@ -202,6 +212,39 @@ class TestMlKemPkeUtils(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = kyber_pke_encryption(pk, msg, "ML-KEM-768", coins=b"short")
 
+    def test_encryption_rejects_non_256_degree_params(self):
+        pk, _ = kyber_pke_keygen("ML-KEM-768")
+        msg = b"0" * 32
+        bad_params = {
+            "q": 3329,
+            "n": 128,
+            "k": 3,
+            "eta1": 2,
+            "eta2": 2,
+            "du": 10,
+            "dv": 4,
+        }
+        with self.assertRaises(ValueError):
+            _ = kyber_pke_encryption(pk, msg, bad_params, coins=b"f" * 32)
+
+    def test_encryption_rejects_public_key_rank_mismatch_after_parse(self):
+        pk, _ = kyber_pke_keygen("ML-KEM-768")
+        msg = b"x" * 32
+        pk_obj = from_bytes(pk)
+
+        # Build a valid module element payload with rank 2 and matching entry count,
+        # so parsing succeeds and the explicit rank-check branch is exercised.
+        pk_obj_bad = dict(pk_obj)
+        t_bad = dict(pk_obj_bad["t"])
+        t_bad["rank"] = 2
+        t_bad["entries"] = t_bad["entries"][:2]
+        pk_obj_bad["t"] = t_bad
+
+        with self.assertRaises(ValueError):
+            _ = kyber_pke_encryption(
+                to_bytes(pk_obj_bad), msg, "ML-KEM-768", coins=b"f" * 32
+            )
+
     def test_decryption_payload_validation_errors(self):
         pk, sk = kyber_pke_keygen("ML-KEM-768")
         msg = b"1" * 32
@@ -242,6 +285,51 @@ class TestMlKemPkeUtils(unittest.TestCase):
         bad_sk_rank["s"] = bad_s
         with self.assertRaises(ValueError):
             _ = kyber_pke_decryption(ct, to_bytes(bad_sk_rank), "ML-KEM-768")
+
+    def test_decryption_rejects_non_256_degree_params(self):
+        pk, sk = kyber_pke_keygen("ML-KEM-768")
+        msg = b"1" * 32
+        ct = kyber_pke_encryption(pk, msg, "ML-KEM-768", coins=b"g" * 32)
+        bad_params = {
+            "q": 3329,
+            "n": 128,
+            "k": 3,
+            "eta1": 2,
+            "eta2": 2,
+            "du": 10,
+            "dv": 4,
+        }
+        with self.assertRaises(ValueError):
+            _ = kyber_pke_decryption(ct, sk, bad_params)
+
+    def test_decryption_rejects_ciphertext_rank_mismatch(self):
+        pk, sk = kyber_pke_keygen("ML-KEM-768")
+        msg = b"2" * 32
+        ct = kyber_pke_encryption(pk, msg, "ML-KEM-768", coins=b"h" * 32)
+        ct_obj = from_bytes(ct)
+
+        bad_c1 = dict(ct_obj["c1"])
+        bad_c1["rank"] = 2
+        bad_ct = dict(ct_obj)
+        bad_ct["c1"] = bad_c1
+
+        with self.assertRaises(ValueError):
+            _ = kyber_pke_decryption(to_bytes(bad_ct), sk, "ML-KEM-768")
+
+    def test_decryption_rejects_secret_key_rank_mismatch_after_parse(self):
+        pk, sk = kyber_pke_keygen("ML-KEM-768")
+        msg = b"y" * 32
+        ct = kyber_pke_encryption(pk, msg, "ML-KEM-768", coins=b"i" * 32)
+        sk_obj = from_bytes(sk)
+
+        sk_bad = dict(sk_obj)
+        s_bad = dict(sk_bad["s"])
+        s_bad["rank"] = 2
+        s_bad["entries"] = s_bad["entries"][:2]
+        sk_bad["s"] = s_bad
+
+        with self.assertRaises(ValueError):
+            _ = kyber_pke_decryption(ct, to_bytes(sk_bad), "ML-KEM-768")
 
     def test_decryption_accepts_legacy_u_v_ciphertext(self):
         pk, sk = kyber_pke_keygen("ML-KEM-768")
