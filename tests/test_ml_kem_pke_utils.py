@@ -268,10 +268,28 @@ class TestMlKemPkeUtils(unittest.TestCase):
 
     def test_keygen_module_reexports(self):
         self.assertIs(keygen_module.kyber_pke_keygen, kyber_pke_keygen)
-        self.assertIs(keygen_module.keygen, kyber_pke_keygen)
+        self.assertIs(keygen_module.keygen, keygen_module.ml_kem_keygen)
         self.assertIn("kyber_pke_keygen", keygen_module.__all__)
         self.assertIn("kyber_pke_encryption", keygen_module.__all__)
         self.assertIn("kyber_pke_decryption", keygen_module.__all__)
+
+    def test_ml_kem_keygen_fo_style_payload(self):
+        ek, dk = keygen_module.keygen("ML-KEM-768", aseed=b"a" * 32)
+        ek_obj = from_bytes(ek)
+        dk_obj = from_bytes(dk)
+
+        self.assertEqual(ek_obj["type"], "ml_kem_encapsulation_key")
+        self.assertIn("rho", ek_obj)
+        self.assertIn("t", ek_obj)
+
+        self.assertEqual(dk_obj["type"], "ml_kem_decapsulation_key")
+        self.assertIn("s", dk_obj)
+        self.assertIn("ek", dk_obj)
+        self.assertIn("h_ek", dk_obj)
+        self.assertIn("z", dk_obj)
+        self.assertEqual(len(bytes.fromhex(dk_obj["h_ek"])), 32)
+        self.assertEqual(len(bytes.fromhex(dk_obj["z"])), 32)
+        self.assertEqual(dk_obj["ek"], ek_obj)
 
 
 if __name__ == "__main__":
