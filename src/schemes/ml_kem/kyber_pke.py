@@ -177,7 +177,6 @@ Where:
 """
 
 from src.core import sampling, polynomials, integers, module, serialization
-from .params import ML_KEM_PARAM_SETS
 from .vectors import expand_matrix_a
 from .pke_utils import (
     resolve_params,
@@ -531,11 +530,11 @@ def kyber_pke_decryption(
 
     # Deserialize/decompress ciphertext components and deserialize secret key.
     if has_compressed_ct:
-        u = decompress_module_element(c1_payload, rq_module_k, expected_bits=du)
-        v = decompress_polynomial(c2_payload, rq, expected_bits=dv)
+        u = decompress_module_element(c1_payload, rq_module_k, expected_bits=du)  # type: ignore
+        v = decompress_polynomial(c2_payload, rq, expected_bits=dv)  # type: ignore
     else:
-        u = serialization.module_element_from_dict(u_payload)
-        v = serialization.polynomial_from_dict(v_payload)
+        u = serialization.module_element_from_dict(u_payload)  # type: ignore
+        v = serialization.polynomial_from_dict(v_payload)  # type: ignore
 
     s = serialization.module_element_from_dict(s_payload)
 
