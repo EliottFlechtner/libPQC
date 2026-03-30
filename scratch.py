@@ -1,37 +1,26 @@
-"""Quick Kyber-PKE encrypt/decrypt demo."""
+"""Quick ML-KEM keygen/encaps/decaps demo."""
 
-from src.schemes.ml_kem.kyber_pke import (
-    kyber_pke_decryption,
-    kyber_pke_encryption,
-    kyber_pke_keygen,
-)
+from src.schemes.ml_kem.decaps import ml_kem_decaps
+from src.schemes.ml_kem.encaps import ml_kem_encaps
+from src.schemes.ml_kem.keygen import ml_kem_keygen
 
 
 def main() -> None:
     params = "ML-KEM-768"
 
-    # 1) Generate PKE keys
-    public_key, secret_key = kyber_pke_keygen(params)
+    # 1) Alice generates ML-KEM keys.
+    ek, dk = ml_kem_keygen(params, aseed=b"demo-aseed-for-ml-kem")
 
-    # 2) Encrypt a 32-byte message (Kyber-PKE message size)
-    message = b"0123456789abcdef0123456789abcdef"
-    if len(message) != 32:
-        raise ValueError("demo message must be exactly 32 bytes")
+    # 2) Bob encapsulates to Alice using ek.
+    shared_key_bob, ciphertext = ml_kem_encaps(ek, params)
 
-    ciphertext = kyber_pke_encryption(
-        public_key,
-        message,
-        params=params,
-        coins=b"abcdefghijklmnopqrstuvwx12345678",
-    )
+    # 3) Alice decapsulates using dk.
+    shared_key_alice = ml_kem_decaps(ciphertext, dk, params)
 
-    # 3) Decrypt and verify
-    recovered = kyber_pke_decryption(ciphertext, secret_key, params=params)
-
-    print("Original:", message.hex())
-    print("Recovered:", recovered.hex())
-    print("Match:", recovered == message)
-    print("Public key bytes:", len(public_key))
+    print("Shared key (Bob):   ", shared_key_bob.hex())
+    print("Shared key (Alice): ", shared_key_alice.hex())
+    print("Match:", shared_key_bob == shared_key_alice)
+    print("Encapsulation key bytes:", len(ek))
     print("Ciphertext bytes:", len(ciphertext))
 
 
