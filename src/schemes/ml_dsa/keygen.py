@@ -1,10 +1,11 @@
-"""Simplified ML-DSA key generation.
+"""ML-DSA key generation.
 
-Implements a first-pass MLWE-style keygen flow:
+Implements the key expansion and Power2Round split used by ML-DSA:
 1. Expand xi into rho, rho' and K.
 2. Expand A from rho and s1/s2 from rho'.
-3. Compute t = A s1 + s2 and tr = H(rho || t, 2*lambda).
-4. Output PK=(rho, t), SK=(rho, K, tr, s1, s2).
+3. Compute t = A s1 + s2 and split t -> (t1, t0) via Power2Round(., d).
+4. Compute tr = H(rho || t1, 512).
+5. Output VK=(rho, t1), SK=(rho, K, tr, s1, s2, t0).
 """
 
 from typing import Any, Dict, Tuple
@@ -17,14 +18,19 @@ from src.schemes.utils import (
 )
 
 from .params import ML_DSA_PARAM_SETS, MlDsaParams
-from .sign_verify_utils import expand_a, expand_s, hash_shake_bits
+from .sign_verify_utils import (
+    expand_a,
+    expand_s,
+    hash_shake_bits,
+    power2round_module,
+)
 
 
 def _resolve_params(params: MlDsaParams) -> Dict[str, Any]:
     return resolve_named_params(
         params=params,
         preset_map=ML_DSA_PARAM_SETS,
-        required=("q", "n", "k", "l", "eta"),
+        required=("q", "n", "k", "l", "eta", "d", "lambda"),
         unknown_message=f"Unknown ML-DSA parameter set: {params}",
         type_message="params must be a string preset or dictionary",
         missing_message_prefix="params missing required keys",
@@ -78,16 +84,18 @@ def ml_dsa_keygen(
         zero_element=r_q.zero(),
     )
     t = r_q_k.element(t_entries)
-    t_payload = serialization.module_element_to_dict(t)
+    t1, t0 = power2round_module(t, target_module=r_q_k, d=resolved["d"])
+    t1_payload = serialization.module_element_to_dict(t1)
+    t0_payload = serialization.module_element_to_dict(t0)
 
-    tr = hash_shake_bits(rho + serialization.to_bytes(t_payload), 2 * lambda_bits)
+    tr = hash_shake_bits(rho + serialization.to_bytes(t1_payload), 512)
 
     vk_payload = {
         "version": 1,
         "type": "ml_dsa_verification_key",
         "params": param_name,
         "rho": rho.hex(),
-        "t": t_payload,
+        "t1": t1_payload,
     }
     sk_payload = {
         "version": 1,
@@ -98,6 +106,7 @@ def ml_dsa_keygen(
         "tr": tr.hex(),
         "s1": serialization.module_element_to_dict(s1),
         "s2": serialization.module_element_to_dict(s2),
+        "t0": t0_payload,
     }
 
     return serialization.to_bytes(vk_payload), serialization.to_bytes(sk_payload)

@@ -5,7 +5,7 @@ Flow (spec-style):
 2. Compute mu = H(tr || M, 512) and rho'' = H(K || rnd || mu, 512).
 3. Iteratively sample y via ExpandMask(rho'', kappa).
 4. Build c_tilde = H(mu || HighBits(Ay), 2*lambda), then c = SampleInBall(c_tilde).
-5. Accept when z and LowBits(w - c*s2) satisfy norm bounds.
+5. Accept when z, LowBits(w-c*s2), ct0 and hint weight satisfy bounds.
 """
 
 from typing import Any, Dict
@@ -19,8 +19,10 @@ from .sign_verify_utils import (
     expand_a,
     expand_mask,
     high_bits_module,
+    hint_ones_count,
     low_bits_module,
     low_bits_sufficiently_small,
+    make_hint_payload,
     module_inf_norm,
     resolve_ml_dsa_sign_params,
     sample_in_ball,
@@ -69,7 +71,9 @@ def ml_dsa_sign(
     gamma2 = resolved["gamma2"]
     tau = resolved["tau"]
     beta = resolved["beta"]
+    omega = resolved["omega"]
     lambda_bits = resolved["lambda"]
+    alpha = 2 * gamma2
     param_name = resolved.get("name", "custom")
 
     z_q = integers.IntegersRing(q)
@@ -97,21 +101,28 @@ def ml_dsa_sign(
 
     s1_payload = sk_payload.get("s1")
     s2_payload = sk_payload.get("s2")
+    t0_payload = sk_payload.get("t0")
     if not isinstance(s1_payload, dict):
         raise ValueError("signing key payload missing s1")
     if not isinstance(s2_payload, dict):
         raise ValueError("signing key payload missing s2")
+    if not isinstance(t0_payload, dict):
+        raise ValueError("signing key payload missing t0")
     s1 = serialization.module_element_from_dict(s1_payload)
     s2 = serialization.module_element_from_dict(s2_payload)
+    t0 = serialization.module_element_from_dict(t0_payload)
     if s1.module.rank != l:
         raise ValueError("s1 rank mismatch")
     if s2.module.rank != k:
         raise ValueError("s2 rank mismatch")
+    if t0.module.rank != k:
+        raise ValueError("t0 rank mismatch")
 
     rql_module = module.Module(r_q, rank=l)
     rk_module = module.Module(r_q, rank=k)
     s1 = rql_module.element([entry.to_coefficients(n) for entry in s1.entries])
     s2 = rk_module.element([entry.to_coefficients(n) for entry in s2.entries])
+    t0 = rk_module.element([entry.to_coefficients(n) for entry in t0.entries])
 
     if rnd is None:
         rnd_bytes = b"\x00" * 32
@@ -127,6 +138,7 @@ def ml_dsa_sign(
 
     c_tilde = None
     z = None
+    hint = None
     kappa = 0
     for _ in range(max_iterations):
         y = expand_mask(rho_2prime, rql_module, gamma1=gamma1, kappa=kappa)
@@ -137,7 +149,7 @@ def ml_dsa_sign(
             zero_element=r_q.zero(),
         )
         w = rk_module.element(w_entries)
-        w1 = high_bits_module(w, rk_module, gamma2=gamma2)
+        w1 = high_bits_module(w, rk_module, alpha=alpha)
 
         w1_payload = serialization.module_element_to_dict(w1)
         c_tilde_try = challenge_digest(mu, w1_payload, lambda_bits=lambda_bits)
@@ -145,16 +157,28 @@ def ml_dsa_sign(
         z_try = y + s1.scalar_mul(c_try)
 
         cs2 = s2.scalar_mul(c_try)
-        low = low_bits_module(w - cs2, rk_module, gamma2=gamma2)
+        low = low_bits_module(w - cs2, rk_module, alpha=alpha)
+        ct0 = t0.scalar_mul(c_try)
+        hint_try = make_hint_payload(
+            z_value=ct0.scalar_mul(-1),
+            r_value=(w - cs2) + ct0,
+            alpha=alpha,
+            q=q,
+            n=n,
+        )
+
         z_ok = module_inf_norm(z_try) < (gamma1 - beta)
         low_ok = low_bits_sufficiently_small(low, gamma2=gamma2, beta=beta)
-        if z_ok and low_ok:
+        ct0_ok = module_inf_norm(ct0) < gamma2
+        hint_ok = hint_ones_count(hint_try) <= omega
+        if z_ok and low_ok and ct0_ok and hint_ok:
             c_tilde = c_tilde_try
             z = z_try
+            hint = hint_try
             break
         kappa += l
 
-    if c_tilde is None or z is None:
+    if c_tilde is None or z is None or hint is None:
         raise RuntimeError(
             "failed to sample acceptable signature within max_iterations"
         )
@@ -165,6 +189,7 @@ def ml_dsa_sign(
         "params": param_name,
         "c_tilde": c_tilde.hex(),
         "z": serialization.module_element_to_dict(z),
+        "h": hint,
     }
     return serialization.to_bytes(signature_payload)
 
