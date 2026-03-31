@@ -23,6 +23,8 @@ class TestMlDsaKeygenSimplified(unittest.TestCase):
         t_payload = vk_obj["t"]
         s1_payload = sk_obj["s1"]
         s2_payload = sk_obj["s2"]
+        self.assertIn("A", vk_obj)
+        self.assertNotIn("A", sk_obj)
         self.assertEqual(t_payload["rank"], 8)
         self.assertEqual(s1_payload["rank"], 7)
         self.assertEqual(s2_payload["rank"], 8)
