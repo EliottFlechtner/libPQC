@@ -4,9 +4,9 @@ from src.core import sampling
 from src.schemes.ml_kem.hashes import G, H, J, derive_k_r
 from src.schemes.ml_kem.keygen import (
     _patched_sampling_random_seed,
-    _to_seed_bytes,
     ml_kem_keygen,
 )
+from src.schemes.utils import to_seed_bytes
 
 
 class TestMlKemHashesAndKeygen(unittest.TestCase):
@@ -34,12 +34,12 @@ class TestMlKemHashesAndKeygen(unittest.TestCase):
             _ = derive_k_r(b"x" * 32, b"short")
 
     def test_to_seed_bytes_validation(self):
-        self.assertEqual(_to_seed_bytes("abc"), b"abc")
-        self.assertEqual(_to_seed_bytes(b"abc"), b"abc")
+        self.assertEqual(to_seed_bytes("abc"), b"abc")
+        self.assertEqual(to_seed_bytes(b"abc"), b"abc")
         with self.assertRaises(TypeError):
-            _ = _to_seed_bytes(123)  # type: ignore[arg-type]
+            _ = to_seed_bytes(123)  # type: ignore[arg-type]
         with self.assertRaises(ValueError):
-            _ = _to_seed_bytes("")
+            _ = to_seed_bytes("")
 
     def test_patched_sampling_random_seed_validation(self):
         with _patched_sampling_random_seed(b"seed"):

@@ -10,41 +10,27 @@ from hashlib import shake_256
 from typing import Any, Dict, Tuple
 
 from src.core import integers, module, polynomials, sampling, serialization
+from src.schemes.utils import resolve_named_params, to_seed_bytes
 
 from .params import ML_DSA_PARAM_SETS
 
 MlDsaParams = Dict[str, Any] | str
 
 
-def _to_seed_bytes(aseed: bytes | str) -> bytes:
-    if isinstance(aseed, str):
-        seed = aseed.encode("utf-8")
-    elif isinstance(aseed, (bytes, bytearray)):
-        seed = bytes(aseed)
-    else:
-        raise TypeError("aseed must be bytes-like or a string")
-    if not seed:
-        raise ValueError("aseed must not be empty")
-    return seed
-
-
 def _resolve_params(params: MlDsaParams) -> Dict[str, Any]:
-    if isinstance(params, str):
-        try:
-            resolved = ML_DSA_PARAM_SETS[params]
-        except KeyError as exc:
-            raise ValueError(f"Unknown ML-DSA parameter set: {params}") from exc
-    elif isinstance(params, dict):
-        resolved = params
-    else:
-        raise TypeError("params must be a string preset or dictionary")
-
-    required = ["q", "n", "k", "l", "eta"]
-    missing = [name for name in required if name not in resolved]
-    if missing:
-        raise ValueError(f"params missing required keys: {', '.join(missing)}")
-
-    return resolved
+    try:
+        return resolve_named_params(
+            params=params,
+            preset_map=ML_DSA_PARAM_SETS,
+            required=("q", "n", "k", "l", "eta"),
+            unknown_message=f"Unknown ML-DSA parameter set: {params}",
+            type_message="params must be a string preset or dictionary",
+        )
+    except ValueError as exc:
+        if str(exc).startswith("missing required parameters:"):
+            missing = str(exc).split(": ", 1)[1]
+            raise ValueError(f"params missing required keys: {missing}") from exc
+        raise
 
 
 def _derive_matrix_seed(aseed: bytes) -> bytes:
@@ -98,7 +84,7 @@ def ml_dsa_keygen(
         rng_s1 = None
         rng_s2 = None
     else:
-        seed = _to_seed_bytes(aseed)
+        seed = to_seed_bytes(aseed)
         matrix_seed = _derive_matrix_seed(seed)
         rng_s1 = sampling.make_deterministic_rng(
             sampling.derive_seed(seed, "ml-dsa-s1", 32)
