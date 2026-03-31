@@ -2,6 +2,7 @@ import unittest
 
 from src.core import integers, module, polynomials, serialization
 from src.schemes.ml_dsa.keygen import ml_dsa_keygen
+from src.schemes.ml_dsa.sign_verify_utils import expand_a, hash_shake_bits
 
 
 class TestMlDsaKeygenSimplified(unittest.TestCase):
@@ -16,15 +17,17 @@ class TestMlDsaKeygenSimplified(unittest.TestCase):
         self.assertEqual(vk_obj["type"], "ml_dsa_verification_key")
         self.assertEqual(sk_obj["type"], "ml_dsa_signing_key")
 
-        a_payload = vk_obj["A"]
-        self.assertEqual(a_payload["rows"], 8)
-        self.assertEqual(a_payload["cols"], 7)
+        self.assertIn("rho", vk_obj)
+        self.assertIn("t", vk_obj)
+        self.assertNotIn("A", vk_obj)
 
         t_payload = vk_obj["t"]
         s1_payload = sk_obj["s1"]
         s2_payload = sk_obj["s2"]
-        self.assertIn("A", vk_obj)
         self.assertNotIn("A", sk_obj)
+        self.assertIn("rho", sk_obj)
+        self.assertIn("K", sk_obj)
+        self.assertIn("tr", sk_obj)
         self.assertEqual(t_payload["rank"], 8)
         self.assertEqual(s1_payload["rank"], 7)
         self.assertEqual(s2_payload["rank"], 8)
@@ -41,11 +44,10 @@ class TestMlDsaKeygenSimplified(unittest.TestCase):
         vk_obj = serialization.from_bytes(vk)
         sk_obj = serialization.from_bytes(sk)
 
-        a_payload = vk_obj["A"]
-        q = a_payload["modulus"]
-        n = a_payload["degree"]
-        k = a_payload["rows"]
-        l = a_payload["cols"]
+        q = 8380417
+        n = 256
+        k = 8
+        l = 7
 
         z_q = integers.IntegersRing(q)
         r_q = polynomials.QuotientPolynomialRing(z_q, degree=n)
@@ -55,10 +57,8 @@ class TestMlDsaKeygenSimplified(unittest.TestCase):
         s2 = serialization.module_element_from_dict(sk_obj["s2"])
         t = serialization.module_element_from_dict(vk_obj["t"])
 
-        a_matrix = [
-            [self._poly_from_coeffs(coeffs, z_q, n) for coeffs in row]
-            for row in a_payload["entries"]
-        ]
+        rho = bytes.fromhex(vk_obj["rho"])
+        a_matrix = expand_a(rho, r_q, k=k, l=l)
 
         t_recomputed_entries = []
         for i in range(k):
@@ -69,6 +69,16 @@ class TestMlDsaKeygenSimplified(unittest.TestCase):
 
         t_recomputed = r_q_k.element(t_recomputed_entries)
         self.assertEqual(t_recomputed.entries, t.entries)
+
+    def test_keygen_tr_consistency(self):
+        vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"tr-check")
+        vk_obj = serialization.from_bytes(vk)
+        sk_obj = serialization.from_bytes(sk)
+
+        rho = bytes.fromhex(vk_obj["rho"])
+        t_bytes = serialization.to_bytes(vk_obj["t"])
+        expected_tr = hash_shake_bits(rho + t_bytes, 512).hex()
+        self.assertEqual(sk_obj["tr"], expected_tr)
 
 
 if __name__ == "__main__":
