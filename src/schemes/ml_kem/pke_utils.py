@@ -191,6 +191,7 @@ def resolve_params(params: Dict[str, Any] | str) -> Dict[str, Any]:
             "ML-KEM-512, ML-KEM-768, ML-KEM-1024, 512, 768, 1024"
         ),
         type_message="params must be a dict or preset name string",
+        missing_message_prefix="missing required ML-KEM parameters",
     )
 
 
