@@ -168,4 +168,5 @@ def ml_dsa_sign(
     }
     return serialization.to_bytes(signature_payload)
 
-    __all__ = ["MlDsaParams", "ml_dsa_sign"]
+
+__all__ = ["MlDsaParams", "ml_dsa_sign"]
