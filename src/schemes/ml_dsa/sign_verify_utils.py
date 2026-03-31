@@ -7,9 +7,7 @@ from typing import Any, Dict
 from src.core import integers, module, polynomials, serialization
 from src.schemes.utils import resolve_named_params
 
-from .params import ML_DSA_PARAM_SETS
-
-MlDsaParams = Dict[str, Any] | str
+from .params import ML_DSA_PARAM_SETS, MlDsaParams
 
 
 def resolve_ml_dsa_sign_params(params: MlDsaParams) -> Dict[str, Any]:

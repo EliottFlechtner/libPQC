@@ -16,9 +16,7 @@ from src.schemes.utils import (
     to_seed_bytes,
 )
 
-from .params import ML_DSA_PARAM_SETS
-
-MlDsaParams = Dict[str, Any] | str
+from .params import ML_DSA_PARAM_SETS, MlDsaParams
 
 
 def _resolve_params(params: MlDsaParams) -> Dict[str, Any]:

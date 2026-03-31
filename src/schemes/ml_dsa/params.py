@@ -4,6 +4,11 @@ These values match the Dilithium/ML-DSA families and are intended to be the
 single source of truth for future keygen/sign/verify implementations.
 """
 
+from typing import Any
+
+
+MlDsaParams = dict[str, Any] | str
+
 _Q = 8380417
 
 ML_DSA_44 = {
@@ -58,6 +63,7 @@ ML_DSA_PARAM_SETS = {
 }
 
 __all__ = [
+    "MlDsaParams",
     "ML_DSA_44",
     "ML_DSA_65",
     "ML_DSA_87",
