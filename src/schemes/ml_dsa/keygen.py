@@ -1,22 +1,23 @@
 """Simplified ML-DSA key generation.
 
 Implements a first-pass MLWE-style keygen flow:
-1. Sample A in R_q^(k x l), s1 in S_eta^l, s2 in S_eta^k.
-2. Compute t = A s1 + s2.
-3. Output vk = (A, t) and sk = (s1, s2) as serialized payloads.
+1. Expand xi into rho, rho' and K.
+2. Expand A from rho and s1/s2 from rho'.
+3. Compute t = A s1 + s2 and tr = H(rho || t, 2*lambda).
+4. Output PK=(rho, t), SK=(rho, K, tr, s1, s2).
 """
 
 from typing import Any, Dict, Tuple
 
 from src.core import integers, module, polynomials, sampling, serialization
 from src.schemes.utils import (
-    derive_deterministic_rngs,
     mat_vec_add,
     resolve_named_params,
     to_seed_bytes,
 )
 
 from .params import ML_DSA_PARAM_SETS, MlDsaParams
+from .sign_verify_utils import expand_a, expand_s, hash_shake_bits
 
 
 def _resolve_params(params: MlDsaParams) -> Dict[str, Any]:
@@ -28,22 +29,6 @@ def _resolve_params(params: MlDsaParams) -> Dict[str, Any]:
         type_message="params must be a string preset or dictionary",
         missing_message_prefix="params missing required keys",
     )
-
-
-def _matrix_payload(
-    matrix: list[list[polynomials.QuotientPolynomial]], q: int, n: int
-) -> dict:
-    rows = len(matrix)
-    cols = len(matrix[0]) if rows > 0 else 0
-    return {
-        "version": 1,
-        "type": "ml_dsa_matrix",
-        "modulus": q,
-        "degree": n,
-        "rows": rows,
-        "cols": cols,
-        "entries": [[poly.to_coefficients(n) for poly in row] for row in matrix],
-    }
 
 
 def ml_dsa_keygen(
@@ -65,6 +50,7 @@ def ml_dsa_keygen(
     k = resolved["k"]
     l = resolved["l"]
     eta = resolved["eta"]
+    lambda_bits = resolved["lambda"]
     param_name = resolved.get("name", "custom")
 
     z_q = integers.IntegersRing(q)
@@ -73,20 +59,17 @@ def ml_dsa_keygen(
     r_q_k = module.Module(r_q, rank=k)
 
     if aseed is None:
-        rng_matrix = None
-        rng_s1 = None
-        rng_s2 = None
+        xi = sampling.random_seed(32)
     else:
-        seed = to_seed_bytes(aseed)
-        rng_matrix, rng_s1, rng_s2 = derive_deterministic_rngs(
-            seed,
-            labels=("ml-dsa-matrix", "ml-dsa-s1", "ml-dsa-s2"),
-        )
+        xi = to_seed_bytes(aseed, field_name="aseed")
 
-    a_matrix = sampling.sample_uniform_matrix(r_q, rows=k, cols=l, rng=rng_matrix)
+    expanded = hash_shake_bits(xi, 1024)
+    rho = expanded[0:32]
+    rho_prime = expanded[32:64]
+    k_seed = expanded[64:96]
 
-    s1 = sampling.sample_small_vector(r_q_l, eta=eta, method="uniform", rng=rng_s1)
-    s2 = sampling.sample_small_vector(r_q_k, eta=eta, method="uniform", rng=rng_s2)
+    a_matrix = expand_a(rho, r_q, k=k, l=l)
+    s1, s2 = expand_s(rho_prime, r_q_l, r_q_k, eta=eta)
 
     t_entries = mat_vec_add(
         matrix=a_matrix,
@@ -95,18 +78,24 @@ def ml_dsa_keygen(
         zero_element=r_q.zero(),
     )
     t = r_q_k.element(t_entries)
+    t_payload = serialization.module_element_to_dict(t)
+
+    tr = hash_shake_bits(rho + serialization.to_bytes(t_payload), 2 * lambda_bits)
 
     vk_payload = {
         "version": 1,
         "type": "ml_dsa_verification_key",
         "params": param_name,
-        "A": _matrix_payload(a_matrix, q=q, n=n),
-        "t": serialization.module_element_to_dict(t),
+        "rho": rho.hex(),
+        "t": t_payload,
     }
     sk_payload = {
         "version": 1,
         "type": "ml_dsa_signing_key",
         "params": param_name,
+        "rho": rho.hex(),
+        "K": k_seed.hex(),
+        "tr": tr.hex(),
         "s1": serialization.module_element_to_dict(s1),
         "s2": serialization.module_element_to_dict(s2),
     }
