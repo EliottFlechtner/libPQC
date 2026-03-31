@@ -6,11 +6,15 @@ Implements a first-pass MLWE-style keygen flow:
 3. Output vk = (A, t) and sk = (s1, s2) as serialized payloads.
 """
 
-from hashlib import shake_256
 from typing import Any, Dict, Tuple
 
 from src.core import integers, module, polynomials, sampling, serialization
-from src.schemes.utils import resolve_named_params, to_seed_bytes
+from src.schemes.utils import (
+    derive_deterministic_rngs,
+    mat_vec_add,
+    resolve_named_params,
+    to_seed_bytes,
+)
 
 from .params import ML_DSA_PARAM_SETS
 
@@ -18,23 +22,14 @@ MlDsaParams = Dict[str, Any] | str
 
 
 def _resolve_params(params: MlDsaParams) -> Dict[str, Any]:
-    try:
-        return resolve_named_params(
-            params=params,
-            preset_map=ML_DSA_PARAM_SETS,
-            required=("q", "n", "k", "l", "eta"),
-            unknown_message=f"Unknown ML-DSA parameter set: {params}",
-            type_message="params must be a string preset or dictionary",
-        )
-    except ValueError as exc:
-        if str(exc).startswith("missing required parameters:"):
-            missing = str(exc).split(": ", 1)[1]
-            raise ValueError(f"params missing required keys: {missing}") from exc
-        raise
-
-
-def _derive_matrix_seed(aseed: bytes) -> bytes:
-    return shake_256(b"ml-dsa|matrix|" + aseed).digest(32)
+    return resolve_named_params(
+        params=params,
+        preset_map=ML_DSA_PARAM_SETS,
+        required=("q", "n", "k", "l", "eta"),
+        unknown_message=f"Unknown ML-DSA parameter set: {params}",
+        type_message="params must be a string preset or dictionary",
+        missing_message_prefix="params missing required keys",
+    )
 
 
 def _matrix_payload(
@@ -80,31 +75,27 @@ def ml_dsa_keygen(
     r_q_k = module.Module(r_q, rank=k)
 
     if aseed is None:
-        matrix_seed = sampling.random_seed(32)
+        rng_matrix = None
         rng_s1 = None
         rng_s2 = None
     else:
         seed = to_seed_bytes(aseed)
-        matrix_seed = _derive_matrix_seed(seed)
-        rng_s1 = sampling.make_deterministic_rng(
-            sampling.derive_seed(seed, "ml-dsa-s1", 32)
-        )
-        rng_s2 = sampling.make_deterministic_rng(
-            sampling.derive_seed(seed, "ml-dsa-s2", 32)
+        rng_matrix, rng_s1, rng_s2 = derive_deterministic_rngs(
+            seed,
+            labels=("ml-dsa-matrix", "ml-dsa-s1", "ml-dsa-s2"),
         )
 
-    rng_matrix = sampling.make_deterministic_rng(matrix_seed)
     a_matrix = sampling.sample_uniform_matrix(r_q, rows=k, cols=l, rng=rng_matrix)
 
     s1 = sampling.sample_small_vector(r_q_l, eta=eta, method="uniform", rng=rng_s1)
     s2 = sampling.sample_small_vector(r_q_k, eta=eta, method="uniform", rng=rng_s2)
 
-    t_entries = []
-    for i in range(k):
-        acc = r_q.zero()
-        for j in range(l):
-            acc = acc + (a_matrix[i][j] * s1.entries[j])
-        t_entries.append(acc + s2.entries[i])
+    t_entries = mat_vec_add(
+        matrix=a_matrix,
+        vector_entries=s1.entries,
+        add_entries=s2.entries,
+        zero_element=r_q.zero(),
+    )
     t = r_q_k.element(t_entries)
 
     vk_payload = {
