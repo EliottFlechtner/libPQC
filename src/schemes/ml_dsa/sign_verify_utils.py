@@ -1,10 +1,10 @@
-"""Shared helpers for simplified ML-DSA signing and verification."""
+"""Shared helpers for ML-DSA signing and verification."""
 
 import random
 from hashlib import shake_256
 from typing import Any, Dict
 
-from src.core import integers, module, polynomials, sampling, serialization
+from src.core import module, polynomials, sampling, serialization
 from src.schemes.utils import resolve_named_params
 
 from .params import ML_DSA_PARAM_SETS, MlDsaParams
@@ -28,6 +28,7 @@ def resolve_ml_dsa_sign_params(params: MlDsaParams) -> Dict[str, Any]:
         required=(
             "q",
             "n",
+            "d",
             "k",
             "l",
             "eta",
@@ -41,6 +42,54 @@ def resolve_ml_dsa_sign_params(params: MlDsaParams) -> Dict[str, Any]:
         type_message="params must be a string preset or dictionary",
         missing_message_prefix="params missing required keys",
     )
+
+
+def centered_mod(value: int, modulus: int) -> int:
+    """Centered representative in (-modulus/2, modulus/2]."""
+    v = int(value) % modulus
+    half = modulus // 2
+    if v > half:
+        v -= modulus
+    return v
+
+
+def centered_mod_power_of_two(value: int, d: int) -> int:
+    """Centered remainder mods 2^d in (-2^(d-1), 2^(d-1)]."""
+    if not isinstance(d, int) or d <= 0:
+        raise ValueError("d must be a positive integer")
+    m = 1 << d
+    r0 = int(value) % m
+    half = m >> 1
+    if r0 > half:
+        r0 -= m
+    return r0
+
+
+def power2round_coeff(value: int, d: int) -> tuple[int, int]:
+    """Split coefficient into (high, low) with r = high*2^d + low."""
+    low = centered_mod_power_of_two(value, d)
+    high = (int(value) - low) // (1 << d)
+    return high, low
+
+
+def power2round_module(
+    value: module.ModuleElement,
+    target_module: module.Module,
+    d: int,
+) -> tuple[module.ModuleElement, module.ModuleElement]:
+    highs = []
+    lows = []
+    n = target_module.quotient_ring.degree
+    for entry in value.entries:
+        hi = []
+        lo = []
+        for coeff in entry.to_coefficients(n):
+            c_hi, c_lo = power2round_coeff(coeff, d)
+            hi.append(c_hi)
+            lo.append(c_lo)
+        highs.append(target_module.quotient_ring.polynomial(hi))
+        lows.append(target_module.quotient_ring.polynomial(lo))
+    return target_module.element(highs), target_module.element(lows)
 
 
 def expand_a(
@@ -136,9 +185,25 @@ def sample_in_ball(
     return ring.polynomial(coeffs)
 
 
+def matrix_payload(
+    matrix: list[list[polynomials.QuotientPolynomial]], q: int, n: int
+) -> dict:
+    rows = len(matrix)
+    cols = len(matrix[0]) if rows > 0 else 0
+    return {
+        "version": 1,
+        "type": "ml_dsa_matrix",
+        "modulus": q,
+        "degree": n,
+        "rows": rows,
+        "cols": cols,
+        "entries": [[poly.to_coefficients(n) for poly in row] for row in matrix],
+    }
+
+
 def matrix_from_payload(
     payload: dict,
-    ring: integers.IntegersRing,
+    ring: Any,
     degree: int,
 ) -> list[list[polynomials.QuotientPolynomial]]:
     if not isinstance(payload, dict):
@@ -174,45 +239,31 @@ def challenge_digest(
     return hash_shake_bits(bytes(mu) + w1_bytes, 2 * lambda_bits)
 
 
-def _centered_coeff(value: int, q: int) -> int:
-    v = int(value) % q
-    half = q // 2
-    if v > half:
-        v -= q
-    return v
-
-
-def _decompose_coeff(value: int, q: int, gamma2: int) -> tuple[int, int]:
-    if gamma2 <= 0:
-        raise ValueError("gamma2 must be positive")
-
-    alpha = 2 * gamma2
-    centered = _centered_coeff(value, q)
-
-    high = int(round(centered / alpha))
-    low = centered - high * alpha
-
-    while low <= -gamma2:
-        low += alpha
-        high -= 1
-    while low > gamma2:
-        low -= alpha
-        high += 1
-
-    return high, low
+def decompose_coeff(value: int, q: int, alpha: int) -> tuple[int, int]:
+    """Modified Decompose used by Dilithium hint logic."""
+    if alpha <= 0:
+        raise ValueError("alpha must be positive")
+    r = int(value) % q
+    r0 = centered_mod(r, alpha)
+    if (r - r0) == (q - 1):
+        r1 = 0
+        r0 = r0 - 1
+    else:
+        r1 = (r - r0) // alpha
+    return r1, r0
 
 
 def _poly_high_low(
     poly: polynomials.QuotientPolynomial,
     ring: polynomials.QuotientPolynomialRing,
-    gamma2: int,
+    alpha: int,
 ) -> tuple[polynomials.QuotientPolynomial, polynomials.QuotientPolynomial]:
     q = ring.coefficient_ring.modulus
     n = ring.degree
     highs = []
     lows = []
     for coeff in poly.to_coefficients(n):
-        high, low = _decompose_coeff(coeff, q, gamma2)
+        high, low = decompose_coeff(coeff, q, alpha)
         highs.append(high)
         lows.append(low)
     return ring.polynomial(highs), ring.polynomial(lows)
@@ -221,11 +272,11 @@ def _poly_high_low(
 def high_bits_module(
     value: module.ModuleElement,
     target_module: module.Module,
-    gamma2: int,
+    alpha: int,
 ) -> module.ModuleElement:
     highs = []
     for entry in value.entries:
-        high, _ = _poly_high_low(entry, target_module.quotient_ring, gamma2)
+        high, _ = _poly_high_low(entry, target_module.quotient_ring, alpha)
         highs.append(high)
     return target_module.element(highs)
 
@@ -233,13 +284,85 @@ def high_bits_module(
 def low_bits_module(
     value: module.ModuleElement,
     target_module: module.Module,
-    gamma2: int,
+    alpha: int,
 ) -> module.ModuleElement:
     lows = []
     for entry in value.entries:
-        _, low = _poly_high_low(entry, target_module.quotient_ring, gamma2)
+        _, low = _poly_high_low(entry, target_module.quotient_ring, alpha)
         lows.append(low)
     return target_module.element(lows)
+
+
+def hint_payload(hints: list[list[int]], q: int, n: int, k: int) -> dict:
+    return {
+        "version": 1,
+        "type": "ml_dsa_hint",
+        "modulus": q,
+        "degree": n,
+        "rank": k,
+        "entries": hints,
+    }
+
+
+def make_hint_payload(
+    z_value: module.ModuleElement,
+    r_value: module.ModuleElement,
+    alpha: int,
+    q: int,
+    n: int,
+) -> dict:
+    """Compute hint bits where HighBits(r+z) differs from HighBits(r)."""
+    hints = []
+    for z_entry, r_entry in zip(z_value.entries, r_value.entries):
+        row = []
+        z_coeffs = z_entry.to_coefficients(n)
+        r_coeffs = r_entry.to_coefficients(n)
+        for zc, rc in zip(z_coeffs, r_coeffs):
+            high_rz, _ = decompose_coeff((rc + zc) % q, q, alpha)
+            high_r, _ = decompose_coeff(rc % q, q, alpha)
+            row.append(1 if high_rz != high_r else 0)
+        hints.append(row)
+    return hint_payload(hints, q=q, n=n, k=len(hints))
+
+
+def hint_ones_count(payload: dict) -> int:
+    entries = payload.get("entries", [])
+    return sum(int(bit) for row in entries for bit in row)
+
+
+def use_hint_module(
+    hint: dict,
+    r_value: module.ModuleElement,
+    target_module: module.Module,
+    alpha: int,
+) -> module.ModuleElement:
+    """Recover high bits of (r+z) from hint and r only."""
+    q = target_module.quotient_ring.coefficient_ring.modulus
+    n = target_module.quotient_ring.degree
+    m = (q - 1) // alpha
+
+    if hint.get("type") != "ml_dsa_hint":
+        raise ValueError("invalid hint payload type")
+    entries = hint.get("entries")
+    if not isinstance(entries, list) or len(entries) != target_module.rank:
+        raise ValueError("hint entry layout mismatch")
+
+    out = []
+    for r_entry, h_row in zip(r_value.entries, entries):
+        if not isinstance(h_row, list) or len(h_row) != n:
+            raise ValueError("hint row size mismatch")
+        row = []
+        r_coeffs = r_entry.to_coefficients(n)
+        for coeff, h_bit in zip(r_coeffs, h_row):
+            r1, r0 = decompose_coeff(coeff % q, q, alpha)
+            if int(h_bit) == 1:
+                if r0 > 0:
+                    r1 = (r1 + 1) % m
+                else:
+                    r1 = (r1 - 1) % m
+            row.append(r1)
+        out.append(target_module.quotient_ring.polynomial(row))
+    return target_module.element(out)
 
 
 def low_bits_sufficiently_small(
@@ -252,7 +375,7 @@ def low_bits_sufficiently_small(
     n = value.module.quotient_ring.degree
     for entry in value.entries:
         for coeff in entry.to_coefficients(n):
-            if abs(_centered_coeff(coeff, q)) > bound:
+            if abs(centered_mod(coeff, q)) > bound:
                 return False
     return True
 
@@ -264,7 +387,7 @@ def module_inf_norm(value: module.ModuleElement) -> int:
     norm = 0
     for entry in value.entries:
         for coeff in entry.to_coefficients(n):
-            norm = max(norm, abs(_centered_coeff(coeff, q)))
+            norm = max(norm, abs(centered_mod(coeff, q)))
     return norm
 
 
@@ -272,14 +395,22 @@ __all__ = [
     "MlDsaParams",
     "hash_shake_bits",
     "resolve_ml_dsa_sign_params",
+    "centered_mod",
+    "power2round_coeff",
+    "power2round_module",
+    "decompose_coeff",
     "expand_a",
     "expand_s",
     "expand_mask",
     "sample_in_ball",
     "challenge_digest",
+    "matrix_payload",
     "matrix_from_payload",
     "high_bits_module",
     "low_bits_module",
+    "make_hint_payload",
+    "hint_ones_count",
+    "use_hint_module",
     "low_bits_sufficiently_small",
     "module_inf_norm",
 ]
