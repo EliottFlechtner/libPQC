@@ -2,8 +2,9 @@ import unittest
 
 from src.core import serialization
 from src.schemes.ml_dsa.keygen import ml_dsa_keygen
+from src.schemes.ml_dsa.params import ML_DSA_87
 from src.schemes.ml_dsa.sign import ml_dsa_sign
-from src.schemes.ml_dsa.sign_verify_utils import sample_in_ball
+from src.schemes.ml_dsa.sign_verify_utils import hint_ones_count, sample_in_ball
 from src.schemes.ml_dsa.verify import ml_dsa_verify
 
 
@@ -20,12 +21,15 @@ class TestMlDsaSignSimplified(unittest.TestCase):
         self.assertEqual(sig_obj["type"], "ml_dsa_signature")
         self.assertIn("c_tilde", sig_obj)
         self.assertIn("z", sig_obj)
+        self.assertIn("h", sig_obj)
 
         z_payload = sig_obj["z"]
 
         self.assertIsInstance(sig_obj["c_tilde"], str)
         self.assertEqual(z_payload["type"], "module_element")
         self.assertEqual(z_payload["rank"], 7)
+        self.assertEqual(sig_obj["h"]["type"], "ml_dsa_hint")
+        self.assertLessEqual(hint_ones_count(sig_obj["h"]), ML_DSA_87["omega"])
 
     def test_sign_seeded_deterministic(self):
         vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"ml-dsa-sign-k")
