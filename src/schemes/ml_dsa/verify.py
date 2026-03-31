@@ -7,10 +7,13 @@ from src.schemes.utils import mat_vec_add
 
 from .sign_verify_utils import (
     MlDsaParams,
-    challenge_poly,
+    challenge_digest,
+    expand_a,
     high_bits_module,
-    matrix_from_payload,
+    hash_shake_bits,
+    module_inf_norm,
     resolve_ml_dsa_sign_params,
+    sample_in_ball,
 )
 
 
@@ -53,21 +56,25 @@ def ml_dsa_verify(
     n = resolved["n"]
     k = resolved["k"]
     l = resolved["l"]
+    gamma1 = resolved["gamma1"]
     gamma2 = resolved["gamma2"]
     tau = resolved["tau"]
+    beta = resolved["beta"]
+    lambda_bits = resolved["lambda"]
 
     z_q = integers.IntegersRing(q)
     r_q = polynomials.QuotientPolynomialRing(z_q, degree=n)
     rk_module = module.Module(r_q, rank=k)
 
-    a_payload = vk_payload.get("A")
+    rho_hex = vk_payload.get("rho")
     t_payload = vk_payload.get("t")
-    if not isinstance(a_payload, dict):
-        raise ValueError("verification key payload missing A")
+    if not isinstance(rho_hex, str):
+        raise ValueError("verification key payload missing rho")
     if not isinstance(t_payload, dict):
         raise ValueError("verification key payload missing t")
 
-    a_matrix = matrix_from_payload(a_payload, z_q, n)
+    rho = bytes.fromhex(rho_hex)
+    a_matrix = expand_a(rho, r_q, k=k, l=l)
     if len(a_matrix) != k or any(len(row) != l for row in a_matrix):
         raise ValueError("verification key matrix dimensions mismatch")
 
@@ -76,16 +83,15 @@ def ml_dsa_verify(
         raise ValueError("verification key t rank mismatch")
     t = rk_module.element([entry.to_coefficients(n) for entry in t.entries])
 
-    c_payload = sig_payload.get("c")
+    c_tilde_hex = sig_payload.get("c_tilde")
     z_payload = sig_payload.get("z")
-    if not isinstance(c_payload, dict):
-        raise ValueError("signature missing c")
+    if not isinstance(c_tilde_hex, str):
+        raise ValueError("signature missing c_tilde")
     if not isinstance(z_payload, dict):
         raise ValueError("signature missing z")
 
-    c_obj = serialization.polynomial_from_dict(c_payload)
-    if not isinstance(c_obj, polynomials.QuotientPolynomial):
-        raise ValueError("signature c must be a quotient polynomial")
+    c_tilde = bytes.fromhex(c_tilde_hex)
+    c_obj = sample_in_ball(c_tilde, r_q, tau=tau)
     z = serialization.module_element_from_dict(z_payload)
     if z.module.rank != l:
         raise ValueError("signature z rank mismatch")
@@ -96,6 +102,9 @@ def ml_dsa_verify(
     z_entries = [entry.to_coefficients(n) for entry in z.entries]
     z_module = module.Module(r_q, rank=l)
     z = z_module.element(z_entries)
+
+    if module_inf_norm(z) >= (gamma1 - beta):
+        return False
 
     zeros_k = [r_q.zero() for _ in range(k)]
     az_entries = mat_vec_add(
@@ -109,10 +118,13 @@ def ml_dsa_verify(
     ct = t.scalar_mul(c_obj)
     w1_prime = high_bits_module(az - ct, rk_module, gamma2=gamma2)
 
+    t_bytes = serialization.to_bytes(t_payload)
+    tr = hash_shake_bits(rho + t_bytes, 512)
+    mu = hash_shake_bits(tr + message_bytes, 512)
     w1_prime_payload = serialization.module_element_to_dict(w1_prime)
-    c_expected = challenge_poly(message_bytes, w1_prime_payload, r_q, tau=tau)
+    c_expected = challenge_digest(mu, w1_prime_payload, lambda_bits=lambda_bits)
 
-    return c_expected.to_coefficients(n) == c_obj.to_coefficients(n)
+    return c_expected == c_tilde
 
 
 __all__ = ["MlDsaParams", "ml_dsa_verify"]
