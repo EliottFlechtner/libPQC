@@ -1,7 +1,7 @@
 # Coverage Report
 
-- **Total coverage:** `91.34%`
-- **Updated:** `2026-03-31 22:26 UTC`
+- **Total coverage:** `91.13%`
+- **Updated:** `2026-03-31 22:51 UTC`
 
 ## Files
 
