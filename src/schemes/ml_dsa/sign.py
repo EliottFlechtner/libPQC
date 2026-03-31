@@ -153,23 +153,4 @@ def ml_dsa_sign(
     return serialization.to_bytes(signature_payload)
 
 
-def sign(
-    message: bytes | str,
-    signing_key: bytes,
-    verification_key: bytes,
-    params: MlDsaParams | None = None,
-    rseed: bytes | str | None = None,
-    max_iterations: int = 64,
-) -> bytes:
-    """Compatibility wrapper for ml_dsa_sign."""
-    return ml_dsa_sign(
-        message=message,
-        signing_key=signing_key,
-        verification_key=verification_key,
-        params=params,
-        rseed=rseed,
-        max_iterations=max_iterations,
-    )
-
-
-__all__ = ["MlDsaParams", "ml_dsa_sign", "sign"]
+__all__ = ["MlDsaParams", "ml_dsa_sign"]

@@ -115,19 +115,4 @@ def ml_dsa_verify(
     return c_expected.to_coefficients(n) == c_obj.to_coefficients(n)
 
 
-def verify(
-    message: bytes | str,
-    signature: bytes,
-    verification_key: bytes,
-    params: MlDsaParams | None = None,
-) -> bool:
-    """Compatibility wrapper for ml_dsa_verify."""
-    return ml_dsa_verify(
-        message=message,
-        signature=signature,
-        verification_key=verification_key,
-        params=params,
-    )
-
-
-__all__ = ["MlDsaParams", "ml_dsa_verify", "verify"]
+__all__ = ["MlDsaParams", "ml_dsa_verify"]
