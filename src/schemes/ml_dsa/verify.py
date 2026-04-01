@@ -1,6 +1,4 @@
-"""Simplified ML-DSA signature verification."""
-
-from typing import Any, Dict
+"""ML-DSA signature verification."""
 
 from src.core import integers, module, polynomials, serialization
 from src.schemes.utils import mat_vec_add
@@ -10,7 +8,6 @@ from .sign_verify_utils import (
     challenge_digest,
     expand_a,
     hint_ones_count,
-    high_bits_module,
     hash_shake_bits,
     module_inf_norm,
     resolve_ml_dsa_sign_params,
@@ -25,7 +22,11 @@ def ml_dsa_verify(
     verification_key: bytes,
     params: MlDsaParams | None = None,
 ) -> bool:
-    """Verify ML-DSA signature via UseHint(Az - c*t1*2^d) challenge check."""
+    """Verify an ML-DSA signature.
+
+    This reconstructs `w1'` with `UseHint(h, Az - c*t1*2^d)`, recomputes the
+    challenge digest, and compares it with `c_tilde`.
+    """
     if isinstance(message, str):
         message_bytes = message.encode("utf-8")
     elif isinstance(message, (bytes, bytearray)):
