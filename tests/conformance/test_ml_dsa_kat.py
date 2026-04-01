@@ -80,6 +80,39 @@ def _prehash_for_params(message: bytes, params: str) -> bytes:
     raise ValueError(f"unsupported ML-DSA params for prehash: {params}")
 
 
+def _prehash_oid_for_params(params: str) -> bytes:
+    if params == "ML-DSA-44":
+        return bytes.fromhex("0609608648016503040201")  # id-sha256
+    if params == "ML-DSA-65":
+        return bytes.fromhex("0609608648016503040202")  # id-sha384
+    if params == "ML-DSA-87":
+        return bytes.fromhex("0609608648016503040203")  # id-sha512
+    raise ValueError(f"unsupported ML-DSA params for prehash OID: {params}")
+
+
+def _external_message_for_vector(
+    *,
+    vector_name: str,
+    params: str,
+    message: bytes,
+    context: bytes,
+) -> bytes:
+    # External ML-DSA API domain separation:
+    # raw:     M
+    # pure:    0x00 || |ctx| || ctx || M
+    # hashed:  0x01 || |ctx| || ctx || oid(H) || H(M)
+    if _is_hashed_vector(vector_name):
+        return (
+            bytes([1, len(context)])
+            + context
+            + _prehash_oid_for_params(params)
+            + _prehash_for_params(message, params)
+        )
+    if context:
+        return bytes([0, len(context)]) + context + message
+    return message
+
+
 class TestMlDsaKat(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -151,10 +184,17 @@ class TestMlDsaKat(unittest.TestCase):
                     expected_sk = require_hex_field(record, "sk")
                     sm = require_hex_field(record, "sm")
 
-                    signing_message = (
-                        _prehash_for_params(msg, params)
-                        if _is_hashed_vector(vector_file.name)
-                        else msg
+                    context = (
+                        require_hex_field(record, "ctx")
+                        if "ctx" in record.fields
+                        else b""
+                    )
+                    self.assertLessEqual(len(context), 255)
+                    signing_message = _external_message_for_vector(
+                        vector_name=vector_file.name,
+                        params=params,
+                        message=msg,
+                        context=context,
                     )
                     signing_rnd = (
                         require_hex_field(record, "rng")
