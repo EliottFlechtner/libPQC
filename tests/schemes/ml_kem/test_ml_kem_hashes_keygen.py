@@ -2,10 +2,7 @@ import unittest
 
 from src.core import sampling
 from src.schemes.ml_kem.hashes import G, H, J, derive_k_r
-from src.schemes.ml_kem.keygen import (
-    _patched_sampling_random_seed,
-    ml_kem_keygen,
-)
+from src.schemes.ml_kem.keygen import ml_kem_keygen
 from src.schemes.utils import to_seed_bytes
 
 
@@ -41,12 +38,11 @@ class TestMlKemHashesAndKeygen(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = to_seed_bytes("")
 
-    def test_patched_sampling_random_seed_validation(self):
-        with _patched_sampling_random_seed(b"seed"):
-            with self.assertRaises(TypeError):
-                _ = sampling.random_seed("32")  # type: ignore[arg-type]
-            with self.assertRaises(ValueError):
-                _ = sampling.random_seed(0)
+    def test_sampling_random_seed_validation(self):
+        with self.assertRaises(TypeError):
+            _ = sampling.random_seed("32")  # type: ignore[arg-type]
+        with self.assertRaises(ValueError):
+            _ = sampling.random_seed(0)
 
     def test_ml_kem_keygen_covers_random_and_deterministic(self):
         # Random branch (aseed is None)

@@ -8,42 +8,12 @@ comparison in conformance tests.
 from __future__ import annotations
 
 from src.core import serialization
-from src.schemes.ml_kem.pke_utils import resolve_params
-
-
-def _pack_bits_le(values: list[int], bits: int) -> bytes:
-    """Pack fixed-width integers into a little-endian bitstream."""
-    if bits <= 0:
-        raise ValueError("bits must be positive")
-    mask = (1 << bits) - 1
-
-    out = bytearray()
-    acc = 0
-    acc_bits = 0
-
-    for value in values:
-        v = int(value)
-        if v < 0 or v > mask:
-            raise ValueError(f"value {v} does not fit in {bits} bits")
-        acc |= v << acc_bits
-        acc_bits += bits
-        while acc_bits >= 8:
-            out.append(acc & 0xFF)
-            acc >>= 8
-            acc_bits -= 8
-
-    if acc_bits:
-        out.append(acc & 0xFF)
-    return bytes(out)
-
-
-def _encode_polyvec_12(entries: list[list[int]], degree: int) -> bytes:
-    packed = bytearray()
-    for coeffs in entries:
-        if len(coeffs) != degree:
-            raise ValueError("polynomial degree mismatch in polyvec")
-        packed.extend(_pack_bits_le(coeffs, 12))
-    return bytes(packed)
+from src.schemes.ml_kem.pke_utils import (
+    encode_polyvec_12,
+    encode_public_key_bytes,
+    pack_bits_le,
+    resolve_params,
+)
 
 
 def _normalize_poly(coeffs: list[int], expected_degree: int) -> list[int]:
@@ -75,7 +45,6 @@ def _require_module_entries(
 def ml_kem_ek_to_rsp_bytes(encapsulation_key: bytes, params: str | dict) -> bytes:
     """Convert internal `ek` payload bytes to packed RSP public-key bytes."""
     resolved = resolve_params(params)
-    k = resolved["k"]
     n = resolved["n"]
 
     payload = serialization.from_bytes(encapsulation_key)
@@ -89,8 +58,20 @@ def ml_kem_ek_to_rsp_bytes(encapsulation_key: bytes, params: str | dict) -> byte
     if not isinstance(t_payload, dict):
         raise ValueError("encapsulation key payload missing t")
 
-    t_entries = _require_module_entries(t_payload, expected_rank=k, expected_degree=n)
-    return _encode_polyvec_12(t_entries, degree=n) + bytes.fromhex(rho_hex)
+    t_entries = _require_module_entries(
+        t_payload,
+        expected_rank=resolved["k"],
+        expected_degree=n,
+    )
+    # Reuse the same canonical key encoding helper used by runtime codepaths.
+    return encode_public_key_bytes(
+        rho_hex=rho_hex,
+        t_payload={
+            **t_payload,
+            "entries": t_entries,
+        },
+        params=resolved,
+    )
 
 
 def ml_kem_dk_to_rsp_bytes(decapsulation_key: bytes, params: str | dict) -> bytes:
@@ -117,7 +98,7 @@ def ml_kem_dk_to_rsp_bytes(decapsulation_key: bytes, params: str | dict) -> byte
         raise ValueError("decapsulation key payload missing z")
 
     s_entries = _require_module_entries(s_payload, expected_rank=k, expected_degree=n)
-    s_packed = _encode_polyvec_12(s_entries, degree=n)
+    s_packed = encode_polyvec_12(s_entries, degree=n)
 
     ek_bytes = serialization.to_bytes(ek_payload)
     ek_packed = ml_kem_ek_to_rsp_bytes(ek_bytes, params=resolved)
@@ -162,7 +143,7 @@ def ml_kem_ct_to_rsp_bytes(ciphertext: bytes, params: str | dict) -> bytes:
     for poly in c1_entries:
         if not isinstance(poly, list):
             raise ValueError("ciphertext c1 polynomial degree mismatch")
-        c1_packed.extend(_pack_bits_le(_normalize_poly([int(c) for c in poly], n), du))
+        c1_packed.extend(pack_bits_le(_normalize_poly([int(c) for c in poly], n), du))
 
-    c2_packed = _pack_bits_le(_normalize_poly([int(c) for c in c2_coeffs], n), dv)
+    c2_packed = pack_bits_le(_normalize_poly([int(c) for c in c2_coeffs], n), dv)
     return bytes(c1_packed) + c2_packed
