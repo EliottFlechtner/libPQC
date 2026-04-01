@@ -54,6 +54,14 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Local coverage.py html variants (keep tracked canonical coverage/html files clean)
+coverage/html/d_*.html
+coverage/html/coverage_html.js
+coverage/html/style.css
+coverage/html/favicon_32.png
+coverage/html/keybd_closed.png
+coverage/html/keybd_open.png
+
 # Translations
 *.mo
 *.pot
