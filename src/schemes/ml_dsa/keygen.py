@@ -12,7 +12,6 @@ from typing import Any, Dict, Tuple
 
 from src.core import integers, module, polynomials, sampling, serialization
 from src.schemes.utils import (
-    mat_vec_add,
     resolve_named_params,
     to_seed_bytes,
 )
@@ -22,6 +21,8 @@ from .sign_verify_utils import (
     expand_a,
     expand_s,
     hash_shake_bits,
+    mat_vec_add_ahat,
+    pack_t1,
     power2round_module,
 )
 
@@ -74,10 +75,10 @@ def ml_dsa_keygen(
 
     # Expand seed into three independent sub-seeds via SHAKE256 (1024 bits = 128 bytes)
     # This follows ML-DSA spec: xi -> (rho, rho', K) with distinct purposes
-    expanded = hash_shake_bits(xi, 1024)
+    expanded = hash_shake_bits(xi + bytes([k, l]), 1024)
     rho = expanded[0:32]  # Seed for matrix A expansion
-    rho_prime = expanded[32:64]  # Seed for secret vectors (s1, s2)
-    k_seed = expanded[64:96]  # Seed K for randomness during signing
+    rho_prime = expanded[32:96]  # 64-byte seed for secret vectors (s1, s2)
+    k_seed = expanded[96:128]  # Seed K for randomness during signing
 
     # Deterministically expand matrix A (k x l) from rho using SHAKE
     # Each entry A[i,j] is a uniform random polynomial in R_q
@@ -89,11 +90,12 @@ def ml_dsa_keygen(
 
     # Compute public key: t = A * s1 + s2 (matrix-vector product in R_q^k)
     # Each component: t_i = sum_j(A[i,j] * s1[j]) + s2[i]
-    t_entries = mat_vec_add(
+    t_entries = mat_vec_add_ahat(
         matrix=a_matrix,
         vector_entries=s1.entries,
         add_entries=s2.entries,
-        zero_element=r_q.zero(),
+        q=q,
+        n=n,
     )
     t = r_q_k.element(t_entries)
 
@@ -107,7 +109,7 @@ def ml_dsa_keygen(
     # Compute transcript tr = H(rho || t1, 512 bits)
     # Used during signing for deterministic message hashing: mu = H(tr || M, 512)
     # Ensures signer can reproduce tr without storing it elsewhere
-    tr = hash_shake_bits(rho + serialization.to_bytes(t1_payload), 512)
+    tr = hash_shake_bits(rho + pack_t1(t1), 512)
 
     # Verification Key (VK): Shared with verifiers, kept small for efficiency
     # Contains only rho (for A reconstruction) and t1 (compressed public key)
