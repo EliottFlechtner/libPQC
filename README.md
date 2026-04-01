@@ -27,10 +27,17 @@ Lattice-based post-quantum cryptography playground with an implementation-first 
   - `ml_kem_encaps`
   - `ml_kem_decaps`
   - FO-style hash helpers (`G`, `H`, `J`)
+- ML-DSA layer in `src/schemes/ml_dsa`:
+  - `ml_dsa_keygen`
+  - `ml_dsa_sign`
+  - `ml_dsa_verify`
+  - parameter presets (`ML-DSA-44`, `ML-DSA-65`, `ML-DSA-87`)
+  - Power2Round split (`t1` public, `t0` secret)
+  - hint-based signing/verification flow (`MakeHint`/`UseHint` style)
 
 ## Current Scope
 
-This repository currently includes both the ML-KEM PKE building blocks and a working KEM wrapper (`keygen`/`encaps`/`decaps`) built from those primitives. Communication and experiment modules are still scaffolded.
+This repository currently includes a working ML-KEM implementation (`keygen`/`encaps`/`decaps`) and an ML-DSA implementation (`keygen`/`sign`/`verify`). Communication and experiment modules are still scaffolded.
 
 ## Project Layout
 
@@ -57,7 +64,12 @@ src/
       hashes.py         # G/H/J and K/R derivation
 
     ml_dsa/
-      ...               # scaffolding
+      keygen.py
+      sign.py
+      verify.py
+      sign_verify_utils.py
+      params.py
+      ml_dsa.py         # canonical high-level exports
 
   comms/                # scaffolding
   experiments/          # scaffolding
@@ -68,6 +80,8 @@ tests/
     test_*.py
   schemes/
     ml_kem/
+      test_*.py
+    ml_dsa/
       test_*.py
   integration/
     test_*.py
