@@ -6,6 +6,7 @@ encryption/decryption and key generation.
 """
 
 from src.core import polynomials, module
+from src.schemes.utils import resolve_named_params
 from .params import ML_KEM_PARAM_SETS
 from typing import Dict, Any
 
@@ -181,25 +182,17 @@ def resolve_params(params: Dict[str, Any] | str) -> Dict[str, Any]:
         >>> params["k"]
         2
     """
-    if isinstance(params, str):
-        if params not in ML_KEM_PARAM_SETS:
-            raise ValueError(
-                "unknown ML-KEM parameter set; expected one of: "
-                "ML-KEM-512, ML-KEM-768, ML-KEM-1024, 512, 768, 1024"
-            )
-        return dict(ML_KEM_PARAM_SETS[params])
-
-    if not isinstance(params, dict):
-        raise TypeError("params must be a dict or preset name string")
-
-    # Allow caller to pass only a preset name inside a dict.
-    preset = params.get("name")
-    if isinstance(preset, str) and preset in ML_KEM_PARAM_SETS:
-        merged = dict(ML_KEM_PARAM_SETS[preset])
-        merged.update(params)
-        return merged
-
-    return dict(params)
+    return resolve_named_params(
+        params=params,
+        preset_map=ML_KEM_PARAM_SETS,
+        required=REQUIRED_PARAMS,
+        unknown_message=(
+            "unknown ML-KEM parameter set; expected one of: "
+            "ML-KEM-512, ML-KEM-768, ML-KEM-1024, 512, 768, 1024"
+        ),
+        type_message="params must be a dict or preset name string",
+        missing_message_prefix="missing required ML-KEM parameters",
+    )
 
 
 def validate_params(resolved: Dict[str, Any]) -> None:
@@ -220,6 +213,7 @@ def validate_params(resolved: Dict[str, Any]) -> None:
         >>> validate_params({"q": 3329})
         ValueError: missing required ML-KEM parameters: n, k, eta1, eta2, du, dv
     """
+    # Keep public API for callers while resolution now guarantees required keys.
     missing = [name for name in REQUIRED_PARAMS if name not in resolved]
     if missing:
         missing_csv = ", ".join(missing)

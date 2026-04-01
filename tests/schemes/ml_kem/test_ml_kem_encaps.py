@@ -49,6 +49,31 @@ class TestMlKemEncaps(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = ml_kem_encaps(ek, "ML-KEM-768", message=b"short")
 
+    def test_encaps_random_message_branch(self):
+        ek, _ = ml_kem_keygen("ML-KEM-768", aseed=b"k" * 32)
+        shared_key, ciphertext = ml_kem_encaps(ek, "ML-KEM-768", message=None)
+        self.assertEqual(len(shared_key), 32)
+        self.assertIsInstance(ciphertext, bytes)
+
+    def test_encaps_invalid_message_type_raises(self):
+        ek, _ = ml_kem_keygen("ML-KEM-768", aseed=b"k" * 32)
+        with self.assertRaises(TypeError):
+            _ = ml_kem_encaps(ek, "ML-KEM-768", message="bad")  # type: ignore[arg-type]
+
+    def test_encaps_missing_key_fields_raise(self):
+        ek, _ = ml_kem_keygen("ML-KEM-768", aseed=b"k" * 32)
+        ek_obj = from_bytes(ek)
+
+        bad_rho = dict(ek_obj)
+        bad_rho.pop("rho", None)
+        with self.assertRaises(ValueError):
+            _ = ml_kem_encaps(to_bytes(bad_rho), "ML-KEM-768", message=b"m" * 32)
+
+        bad_t = dict(ek_obj)
+        bad_t.pop("t", None)
+        with self.assertRaises(ValueError):
+            _ = ml_kem_encaps(to_bytes(bad_t), "ML-KEM-768", message=b"m" * 32)
+
 
 if __name__ == "__main__":
     unittest.main()

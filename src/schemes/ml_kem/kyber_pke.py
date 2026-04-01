@@ -177,6 +177,11 @@ Where:
 """
 
 from src.core import sampling, polynomials, integers, module, serialization
+from src.schemes.utils import (
+    derive_deterministic_rngs,
+    inner_product_entries,
+    mat_vec_add,
+)
 from .vectors import expand_matrix_a
 from .pke_utils import (
     resolve_params,
@@ -252,8 +257,7 @@ def kyber_pke_keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
     )  # secret seed for deterministic sampling
 
     # Create deterministic RNGs for reproducible secret/error sampling
-    rng_s = sampling.make_deterministic_rng(sampling.derive_seed(sigma, "s", 32))
-    rng_e = sampling.make_deterministic_rng(sampling.derive_seed(sigma, "e", 32))
+    rng_s, rng_e = derive_deterministic_rngs(sigma, labels=("s", "e"))
 
     # Step 1: Expand matrix A ∈ R_q^(k×k) deterministically from public seed rho
     A = expand_matrix_a(rho, R_q, k)
@@ -264,12 +268,12 @@ def kyber_pke_keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
 
     # Step 3: Compute public value t = A*s + e via matrix-vector multiplication
     # Accumulate row-wise products: t_i = sum_j A_{i,j} * s_j + e_i
-    t_entries = []
-    for i in range(k):
-        acc = R_q.zero()  # initialize accumulator for row
-        for j in range(k):
-            acc = acc + (A[i][j] * s.entries[j])  # accumulate A_{i,j} * s_j
-        t_entries.append(acc + e.entries[i])  # add error term
+    t_entries = mat_vec_add(
+        matrix=A,
+        vector_entries=s.entries,
+        add_entries=e.entries,
+        zero_element=R_q.zero(),
+    )
     t = R_q_module_k.element(t_entries)
 
     # Step 4: Serialize public and secret keys as JSON
@@ -396,9 +400,10 @@ def kyber_pke_encryption(
             raise ValueError("coins must be exactly 32 bytes")
 
     # Step 2: Domain-split coins into independent seeds for r, e1, e2 sampling
-    rng_r = sampling.make_deterministic_rng(sampling.derive_seed(seed, "r", 32))
-    rng_e1 = sampling.make_deterministic_rng(sampling.derive_seed(seed, "e1", 32))
-    rng_e2 = sampling.make_deterministic_rng(sampling.derive_seed(seed, "e2", 32))
+    rng_r, rng_e1, rng_e2 = derive_deterministic_rngs(
+        seed,
+        labels=("r", "e1", "e2"),
+    )
 
     # Step 3: Expand matrix A^T (transpose for computing u = A^T * r)
     a_t = expand_matrix_a(rho, rq, k, transpose=True)
@@ -416,18 +421,24 @@ def kyber_pke_encryption(
     m_poly = message_to_poly(message, rq)  # encode message with bit embedding
 
     # Step 5: Compute u = A^T * r + e1 via matrix-vector multiplication
-    u_entries = []
-    for i in range(k):
-        acc = rq.zero()  # initialize accumulator for row
-        for j in range(k):
-            acc = acc + (a_t[i][j] * r.entries[j])  # accumulate A^T_{i,j} * r_j
-        u_entries.append(acc + e1.entries[i])  # add error term
+    u_entries = mat_vec_add(
+        matrix=a_t,
+        vector_entries=r.entries,
+        add_entries=e1.entries,
+        zero_element=rq.zero(),
+    )
     u = rq_module_k.element(u_entries)
 
     # Step 6: Compute v = t^T * r + e2 + m_poly via inner product + encoded message
-    v = e2 + m_poly  # start with error and encoded message
-    for j in range(k):
-        v = v + (t.entries[j] * r.entries[j])  # accumulate t^T * r = sum_j t_j * r_j
+    v = (
+        e2
+        + m_poly
+        + inner_product_entries(
+            t.entries,
+            r.entries,
+            zero_element=rq.zero(),
+        )
+    )
 
     # Step 7: Compress ciphertext components to drop low-order coefficient bits.
     c1 = compress_module_element(u, du)
@@ -544,9 +555,11 @@ def kyber_pke_decryption(
 
     # Step 1: Compute decryption polynomial m_poly = v - s^T * u
     # Start with v, then subtract inner product s^T * u = sum_j s_j * u_j
-    m_poly = v.copy()
-    for j in range(k):
-        m_poly = m_poly - (s.entries[j] * u.entries[j])  # accumulate s^T * u
+    m_poly = v - inner_product_entries(
+        s.entries,
+        u.entries,
+        zero_element=rq.zero(),
+    )
 
     # Step 2: Decode polynomial back to 32-byte message via nearest-neighbor rounding
     # Each coordinate is rounded to nearest {0, (q+1)/2} representing the bit value

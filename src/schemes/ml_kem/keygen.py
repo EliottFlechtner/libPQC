@@ -20,23 +20,12 @@ from contextlib import contextmanager
 from typing import Any, Dict, Iterator, Tuple
 
 from src.core import sampling, serialization
+from src.schemes.utils import to_seed_bytes
 
 from .kyber_pke import kyber_pke_keygen
 from .hashes import G, H, J
 
 MlKemParams = Dict[str, Any] | str
-
-
-def _to_seed_bytes(aseed: bytes | str) -> bytes:
-    if isinstance(aseed, str):
-        seed = aseed.encode("utf-8")
-    elif isinstance(aseed, (bytes, bytearray)):
-        seed = bytes(aseed)
-    else:
-        raise TypeError("aseed must be bytes-like or a string")
-    if not seed:
-        raise ValueError("aseed must not be empty")
-    return seed
 
 
 def _deterministic_bytes(aseed: bytes, label: bytes, size: int) -> bytes:
@@ -94,7 +83,7 @@ def ml_kem_keygen(
         pke_public_key, pke_secret_key = kyber_pke_keygen(params)
         z = sampling.random_seed(32)
     else:
-        seed = _to_seed_bytes(aseed)
+        seed = to_seed_bytes(aseed)
         with _patched_sampling_random_seed(seed):
             pke_public_key, pke_secret_key = kyber_pke_keygen(params)
         z = J(b"ml-kem-z|" + seed)

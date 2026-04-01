@@ -35,7 +35,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install test tooling
+      - name: Install coverage tooling (3.12 only)
+        if: matrix.python-version == '3.12'
         run: |
           python -m pip install --upgrade pip
           python -m pip install coverage
@@ -43,25 +44,62 @@ jobs:
       - name: Bytecode compile check
         run: python -m compileall -q src tests
 
-      - name: Run unit tests with coverage
-        run: python -m coverage run -m unittest discover -s tests -p 'test_*.py'
+      - name: Diagnostic test discovery breakdown
+        if: matrix.python-version == '3.12'
+        run: |
+          python - <<'PY'
+          import unittest
+          from collections import Counter
+
+          suite = unittest.defaultTestLoader.discover('tests', pattern='test_*.py')
+
+          def iter_tests(node):
+            for test in node:
+              if isinstance(test, unittest.TestSuite):
+                yield from iter_tests(test)
+              else:
+                yield test
+
+          tests = list(iter_tests(suite))
+          print(f"Discovered total tests: {len(tests)}")
+
+          by_file = Counter(test.__class__.__module__.replace('.', '/') + '.py' for test in tests)
+          for file_name in sorted(by_file):
+            print(f"{by_file[file_name]:4d}  {file_name}")
+          PY
+
+      - name: Run test suite
+        run: |
+          if [ "${{ matrix.python-version }}" = "3.12" ]; then
+            python -m coverage run -m unittest discover -s tests -p 'test_*.py'
+          else
+            python -m unittest discover -s tests -p 'test_*.py'
+          fi
 
       - name: Coverage summary
+        if: matrix.python-version == '3.12'
         run: python -m coverage report -m
 
       - name: Export coverage XML
+        if: matrix.python-version == '3.12'
         run: python -m coverage xml
 
       - name: Export coverage HTML
+        if: matrix.python-version == '3.12'
         run: python -m coverage html -d htmlcov
 
+      - name: Export coverage JSON
+        if: matrix.python-version == '3.12'
+        run: python -m coverage json
+
       - name: Upload coverage artifact
-        if: always()
+        if: matrix.python-version == '3.12' && always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-py${{ matrix.python-version }}
+          name: coverage-py312
           path: |
             coverage.xml
+            coverage.json
             htmlcov
 
   smoke:
@@ -114,17 +152,18 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install test tooling
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install coverage
+      - name: Download coverage artifact from tests
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-py312
+          path: coverage_artifact
 
-      - name: Generate coverage files
+      - name: Stage coverage files
         run: |
-          python -m coverage run -m unittest discover -s tests -p 'test_*.py'
-          python -m coverage html -d coverage/html
-          python -m coverage xml -o coverage/coverage.xml
-          python -m coverage json -o coverage/coverage.json
+          mkdir -p coverage
+          cp -r coverage_artifact/htmlcov coverage/html
+          cp coverage_artifact/coverage.xml coverage/coverage.xml
+          cp coverage_artifact/coverage.json coverage/coverage.json
 
       - name: Build coverage badge and summary
         run: |
