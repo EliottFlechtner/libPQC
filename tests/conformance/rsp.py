@@ -1,8 +1,8 @@
 """Minimal parser for NIST-style `.rsp` vector files.
 
-The parser keeps the format deliberately simple: comments are ignored, blank
-lines separate records, and each record is returned as an ordered mapping of
-string fields.
+Comments are ignored and records are split by either blank lines, section
+headers, or repeated keys (common in KAT files that omit blank separators).
+Each record is returned as a mapping of string fields.
 """
 
 from __future__ import annotations
@@ -48,6 +48,7 @@ def decode_hex_field(value: str) -> bytes:
 def _iter_rsp_blocks(text: str) -> Iterable[tuple[str | None, list[tuple[str, str]]]]:
     section: str | None = None
     current: list[tuple[str, str]] = []
+    current_keys: set[str] = set()
 
     for raw_line in text.splitlines():
         line = raw_line.strip()
@@ -55,12 +56,14 @@ def _iter_rsp_blocks(text: str) -> Iterable[tuple[str | None, list[tuple[str, st
             if not line and current:
                 yield section, current
                 current = []
+                current_keys = set()
             continue
 
         if line.startswith("[") and line.endswith("]"):
             if current:
                 yield section, current
                 current = []
+                current_keys = set()
             section = line[1:-1].strip() or None
             continue
 
@@ -68,7 +71,18 @@ def _iter_rsp_blocks(text: str) -> Iterable[tuple[str | None, list[tuple[str, st
             raise ValueError(f"Malformed RSP line: {raw_line!r}")
 
         key, value = line.split("=", 1)
-        current.append((key.strip(), value.strip()))
+        key = key.strip()
+        value = value.strip()
+
+        # Many KAT files do not insert blank lines between records and instead
+        # restart each case by repeating keys like "count".
+        if key in current_keys and current:
+            yield section, current
+            current = []
+            current_keys = set()
+
+        current.append((key, value))
+        current_keys.add(key)
 
     if current:
         yield section, current

@@ -35,6 +35,20 @@ ct = cafe
     def test_decode_hex_field_ignores_whitespace(self):
         self.assertEqual(decode_hex_field("de ad be ef"), bytes.fromhex("deadbeef"))
 
+    def test_parse_rsp_text_splits_on_repeated_keys(self):
+        text = """[sample]
+count = 0
+seed = aa
+count = 1
+seed = bb
+"""
+
+        records = parse_rsp_text(text)
+
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[0].fields["count"], "0")
+        self.assertEqual(records[1].fields["count"], "1")
+
     def test_load_rsp_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "vectors.rsp"
