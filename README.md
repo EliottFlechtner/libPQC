@@ -1,13 +1,20 @@
 # libPQC
 
-[![CI](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml/badge.svg?branch=dev)](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml)
+[![CI](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml)
 [![Release](https://github.com/EliottFlechtner/libPQC/actions/workflows/release.yml/badge.svg)](https://github.com/EliottFlechtner/libPQC/actions/workflows/release.yml)
 [![Coverage](coverage/badge.svg)](coverage/summary.md)
 
 Lattice-based post-quantum cryptography playground focused on clear, testable implementations of ML-KEM and ML-DSA.
 
-Current status: first public release candidate.
+Current status: v0.1.0 released.
+
+## Release Highlights
+
+- Working ML-KEM flow: key generation, encapsulation, decapsulation
+- Working ML-DSA flow: key generation, signing, verification
+- Reproducible deterministic demos for both schemes
+- Automated CI, CodeQL, release workflow, and coverage publication
 
 ## What Is Implemented Now
 
@@ -49,7 +56,7 @@ This first release ships a working, tested, educational implementation of:
 
 ## Current Scope
 
-`src/schemes/ml_kem` and `src/schemes/ml_dsa` are the active focus. Communication/protocol simulation modules remain scaffolded and are planned for future iterations.
+`src/schemes/ml_kem` and `src/schemes/ml_dsa` are the active focus. Communication and experiment layers are scaffolded and intentionally minimal in v0.1.0.
 
 ## Project Layout
 
@@ -106,6 +113,8 @@ tests/
 ```bash
 python3 scratch.py
 ```
+
+This runs both ML-KEM and ML-DSA demos in one command.
 
 ### 2. Run scheme-specific demos
 
@@ -199,6 +208,8 @@ git push origin v0.1.0
 
 The workflow runs tests and publishes a source tarball in GitHub Releases.
 
+For release notes, see `CHANGELOG.md`.
+
 ## Design Notes
 
 - Imports should use the canonical `src.*` paths.
@@ -219,6 +230,7 @@ Next priorities:
 - performance profiling and optional optimized paths
 - richer protocol-level examples (key exchange + signed channel skeleton)
 - API stabilization and packaging improvements
+- packaging and distribution ergonomics (CLI/docs/publish flow)
 
 ## License
 
