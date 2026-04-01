@@ -46,6 +46,16 @@ def _max_records() -> int:
     return value
 
 
+def _require_full_processing() -> bool:
+    raw = os.getenv("LIBPQC_KAT_REQUIRE_FULL", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _show_progress() -> bool:
+    raw = os.getenv("LIBPQC_KAT_PROGRESS", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 class TestMlKemKat(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -65,18 +75,49 @@ class TestMlKemKat(unittest.TestCase):
             self.assertTrue(grouped)
 
     def test_vectors_match_implementation_bytes(self):
+        max_records = _max_records()
+        require_full = _require_full_processing()
+
         for vector_file in self.vector_files:
             records = load_ml_kem_rsp(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
+            total_records = len(records)
+
+            if require_full:
+                self.assertGreaterEqual(
+                    max_records,
+                    total_records,
+                    msg=(
+                        "full-vector mode requires LIBPQC_KAT_MAX_RECORDS >= "
+                        f"record count for {vector_file.name} "
+                        f"({total_records})"
+                    ),
+                )
 
             params = _params_from_filename(vector_file.name)
             tested = 0
+            processed = 0
+            show_progress = _show_progress()
+
+            if show_progress:
+                print(
+                    f"[ML-KEM] {vector_file.name}: starting "
+                    f"(max={max_records}, total={total_records})",
+                    flush=True,
+                )
 
             for record in records:
-                if tested >= _max_records():
+                if processed >= max_records:
                     break
 
                 with self.subTest(file=vector_file.name, count=record.get("count")):
+                    processed += 1
+                    if show_progress:
+                        print(
+                            f"[ML-KEM] {vector_file.name}: "
+                            f"{processed}/{min(max_records, total_records)}",
+                            flush=True,
+                        )
                     d = require_hex_field(record, "d")
                     z = require_hex_field(record, "z")
                     msg = require_hex_field(record, "msg")
@@ -103,6 +144,24 @@ class TestMlKemKat(unittest.TestCase):
                     self.assertEqual(ss_decaps, expected_ss)
 
                     tested += 1
+
+            if show_progress:
+                print(
+                    f"[ML-KEM] {vector_file.name}: done "
+                    f"(processed={processed}, tested={tested}, total={total_records})",
+                    flush=True,
+                )
+
+            if require_full:
+                self.assertEqual(
+                    processed,
+                    total_records,
+                    msg=(
+                        "full-vector mode expected all records to be processed in "
+                        f"{vector_file.name}: processed={processed}, "
+                        f"total={total_records}"
+                    ),
+                )
 
 
 if __name__ == "__main__":
