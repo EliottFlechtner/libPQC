@@ -1,7 +1,6 @@
 """Top-level ML-DSA public API.
 
-This module provides a stable, explicit surface for the current simplified
-ML-DSA flow:
+This module provides a stable, explicit public surface for ML-DSA:
 
 - `ml_dsa_keygen`
 - `ml_dsa_sign`

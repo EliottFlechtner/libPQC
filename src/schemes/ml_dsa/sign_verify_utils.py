@@ -22,6 +22,7 @@ def hash_shake_bits(data: bytes, bits: int) -> bytes:
 
 
 def resolve_ml_dsa_sign_params(params: MlDsaParams) -> Dict[str, Any]:
+    """Resolve preset/custom ML-DSA parameters and validate required keys."""
     return resolve_named_params(
         params=params,
         preset_map=ML_DSA_PARAM_SETS,
@@ -77,6 +78,7 @@ def power2round_module(
     target_module: module.Module,
     d: int,
 ) -> tuple[module.ModuleElement, module.ModuleElement]:
+    """Apply `power2round_coeff` to every coefficient of a module element."""
     highs = []
     lows = []
     n = target_module.quotient_ring.degree
@@ -188,6 +190,7 @@ def sample_in_ball(
 def matrix_payload(
     matrix: list[list[polynomials.QuotientPolynomial]], q: int, n: int
 ) -> dict:
+    """Serialize a polynomial matrix into a JSON-friendly payload."""
     rows = len(matrix)
     cols = len(matrix[0]) if rows > 0 else 0
     return {
@@ -206,6 +209,7 @@ def matrix_from_payload(
     ring: Any,
     degree: int,
 ) -> list[list[polynomials.QuotientPolynomial]]:
+    """Deserialize a matrix payload back into quotient polynomials."""
     if not isinstance(payload, dict):
         raise TypeError("A payload must be a dictionary")
     if payload.get("type") != "ml_dsa_matrix":
@@ -274,6 +278,7 @@ def high_bits_module(
     target_module: module.Module,
     alpha: int,
 ) -> module.ModuleElement:
+    """Return component-wise HighBits under the modified decompose rule."""
     highs = []
     for entry in value.entries:
         high, _ = _poly_high_low(entry, target_module.quotient_ring, alpha)
@@ -286,6 +291,7 @@ def low_bits_module(
     target_module: module.Module,
     alpha: int,
 ) -> module.ModuleElement:
+    """Return component-wise LowBits under the modified decompose rule."""
     lows = []
     for entry in value.entries:
         _, low = _poly_high_low(entry, target_module.quotient_ring, alpha)
@@ -294,6 +300,7 @@ def low_bits_module(
 
 
 def hint_payload(hints: list[list[int]], q: int, n: int, k: int) -> dict:
+    """Build the canonical signature hint payload object."""
     return {
         "version": 1,
         "type": "ml_dsa_hint",
@@ -326,6 +333,7 @@ def make_hint_payload(
 
 
 def hint_ones_count(payload: dict) -> int:
+    """Count set bits in a hint payload for omega-bound checks."""
     entries = payload.get("entries", [])
     return sum(int(bit) for row in entries for bit in row)
 
@@ -370,6 +378,7 @@ def low_bits_sufficiently_small(
     gamma2: int,
     beta: int,
 ) -> bool:
+    """Check `||LowBits(.)||_inf <= gamma2 - beta` over all coefficients."""
     bound = max(gamma2 - beta, 0)
     q = value.module.quotient_ring.coefficient_ring.modulus
     n = value.module.quotient_ring.degree
