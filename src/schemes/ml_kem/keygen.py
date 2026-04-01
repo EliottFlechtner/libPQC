@@ -23,6 +23,7 @@ from src.schemes.utils import to_seed_bytes
 
 from .kyber_pke import kyber_pke_keygen
 from .hashes import G, H
+from .pke_utils import encode_public_key_bytes
 
 MlKemParams = Dict[str, Any] | str
 
@@ -91,6 +92,11 @@ def ml_kem_keygen(
         "t": pk_payload["t"],
     }
     ek = serialization.to_bytes(ek_payload)
+    pk_bytes = encode_public_key_bytes(
+        rho_hex=ek_payload["rho"],
+        t_payload=ek_payload["t"],
+        params=params,
+    )
 
     dk_payload = {
         "version": 1,
@@ -98,7 +104,7 @@ def ml_kem_keygen(
         "params": sk_payload.get("params"),
         "s": sk_payload["s"],
         "ek": ek_payload,
-        "h_ek": H(ek).hex(),
+        "h_ek": H(pk_bytes).hex(),
         "z": z.hex(),
     }
     dk = serialization.to_bytes(dk_payload)

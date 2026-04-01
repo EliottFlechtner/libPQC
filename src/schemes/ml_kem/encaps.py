@@ -10,6 +10,7 @@ from src.core import sampling, serialization
 
 from .hashes import H, derive_k_r
 from .kyber_pke import kyber_pke_encryption
+from .pke_utils import encode_public_key_bytes
 
 MlKemParams = Dict[str, Any] | str
 
@@ -64,7 +65,12 @@ def ml_kem_encaps(
         if len(m_bytes) != 32:
             raise ValueError("message must be exactly 32 bytes")
 
-    h_ek = H(ek_bytes)
+    pk_bytes = encode_public_key_bytes(
+        rho_hex=ek_payload["rho"],
+        t_payload=ek_payload["t"],
+        params=params,
+    )
+    h_ek = H(pk_bytes)
     k_value, r_value = derive_k_r(m_bytes, h_ek)
 
     # Adapt ML-KEM ek payload into the public-key payload expected by Kyber-PKE.
