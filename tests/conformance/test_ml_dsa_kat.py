@@ -12,13 +12,17 @@ import re
 import hashlib
 import unittest
 
-from src.core import serialization
 from src.schemes.ml_dsa.ml_dsa import ml_dsa_keygen, ml_dsa_sign, ml_dsa_verify
 from tests.conformance.kat import require_rsp_vectors
 from tests.conformance.ml_dsa import (
     load_ml_dsa_rsp,
     ml_dsa_records_by_section,
     require_hex_field,
+)
+from tests.conformance.ml_dsa_rsp_adapter import (
+    ml_dsa_sig_to_rsp_bytes,
+    ml_dsa_sk_to_rsp_bytes,
+    ml_dsa_vk_to_rsp_bytes,
 )
 
 
@@ -45,6 +49,16 @@ def _max_records() -> int:
 
 def _require_full_processing() -> bool:
     raw = os.getenv("LIBPQC_KAT_REQUIRE_FULL", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _show_progress() -> bool:
+    raw = os.getenv("LIBPQC_KAT_PROGRESS", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _require_adapter_match() -> bool:
+    raw = os.getenv("LIBPQC_KAT_REQUIRE_ADAPTER_MATCH", "1").strip().lower()
     return raw in {"1", "true", "yes", "on"}
 
 
@@ -85,10 +99,9 @@ class TestMlDsaKat(unittest.TestCase):
             self.assertTrue(grouped)
 
     def test_vectors_match_implementation_bytes(self):
-        files_with_compatible_records = 0
-        files_without_compatible_records = 0
         max_records = _max_records()
         require_full = _require_full_processing()
+        require_adapter_match = _require_adapter_match()
 
         for vector_file in self.vector_files:
             records = load_ml_dsa_rsp(vector_file)
@@ -108,8 +121,17 @@ class TestMlDsaKat(unittest.TestCase):
 
             params = _params_from_filename(vector_file.name)
             tested = 0
-            incompatible = 0
             processed = 0
+            strict_matches = 0
+            adapter_mismatches = 0
+            show_progress = _show_progress()
+
+            if show_progress:
+                print(
+                    f"[ML-DSA] {vector_file.name}: starting "
+                    f"(max={max_records}, total={total_records})",
+                    flush=True,
+                )
 
             for record in records:
                 if processed >= _max_records():
@@ -117,6 +139,12 @@ class TestMlDsaKat(unittest.TestCase):
 
                 with self.subTest(file=vector_file.name, count=record.get("count")):
                     processed += 1
+                    if show_progress:
+                        print(
+                            f"[ML-DSA] {vector_file.name}: "
+                            f"{processed}/{min(max_records, total_records)}",
+                            flush=True,
+                        )
                     xi = require_hex_field(record, "xi")
                     msg = require_hex_field(record, "msg")
                     expected_pk = require_hex_field(record, "pk")
@@ -145,41 +173,15 @@ class TestMlDsaKat(unittest.TestCase):
 
                     vk, sk = ml_dsa_keygen(params=params, aseed=xi)
 
-                    # Official NIST vectors use compact binary encodings, while
-                    # this project currently uses JSON payload bytes.
-                    try:
-                        serialization.from_bytes(expected_pk)
-                        serialization.from_bytes(expected_sk)
-                        serialization.from_bytes(expected_sig)
-                    except Exception:
-                        incompatible += 1
-                        # Fallback coverage path: still exercise implementation
-                        # deterministically even if strict byte encoding differs.
-                        sig_one = ml_dsa_sign(
-                            signing_message,
-                            sk,
-                            params=params,
-                            rnd=signing_rnd,
-                        )
-                        sig_two = ml_dsa_sign(
-                            signing_message,
-                            sk,
-                            params=params,
-                            rnd=signing_rnd,
-                        )
-                        self.assertEqual(sig_one, sig_two)
-                        self.assertTrue(
-                            ml_dsa_verify(
-                                signing_message,
-                                sig_one,
-                                vk,
-                                params=params,
-                            )
-                        )
-                        continue
-
-                    self.assertEqual(vk, expected_pk)
-                    self.assertEqual(sk, expected_sk)
+                    # Adapt internal JSON payloads to compact FIPS/KAT byte format.
+                    actual_pk = ml_dsa_vk_to_rsp_bytes(vk, params=params)
+                    actual_sk = ml_dsa_sk_to_rsp_bytes(sk, params=params)
+                    if actual_pk == expected_pk and actual_sk == expected_sk:
+                        strict_matches += 1
+                    else:
+                        adapter_mismatches += 1
+                        self.assertEqual(actual_pk, expected_pk)
+                        self.assertEqual(actual_sk, expected_sk)
 
                     signature = ml_dsa_sign(
                         signing_message,
@@ -187,7 +189,12 @@ class TestMlDsaKat(unittest.TestCase):
                         params=params,
                         rnd=signing_rnd,
                     )
-                    self.assertEqual(signature, expected_sig)
+                    actual_sig = ml_dsa_sig_to_rsp_bytes(signature, params=params)
+                    if actual_sig == expected_sig:
+                        strict_matches += 1
+                    else:
+                        adapter_mismatches += 1
+                        self.assertEqual(actual_sig, expected_sig)
                     self.assertTrue(
                         ml_dsa_verify(
                             signing_message,
@@ -198,11 +205,6 @@ class TestMlDsaKat(unittest.TestCase):
                     )
 
                     tested += 1
-
-            if tested > 0:
-                files_with_compatible_records += 1
-            elif incompatible > 0:
-                files_without_compatible_records += 1
 
             if require_full:
                 self.assertEqual(
@@ -215,11 +217,20 @@ class TestMlDsaKat(unittest.TestCase):
                     ),
                 )
 
-        self.assertGreater(
-            files_with_compatible_records + files_without_compatible_records,
-            0,
-            msg="no ML-DSA vector files were processed",
-        )
+            if show_progress:
+                print(
+                    f"[ML-DSA] {vector_file.name}: done "
+                    f"(processed={processed}, tested={tested}, "
+                    f"strict_matches={strict_matches}, "
+                    f"adapter_mismatches={adapter_mismatches}, "
+                    f"total={total_records})",
+                    flush=True,
+                )
+            self.assertGreater(
+                processed,
+                0,
+                msg=f"no ML-DSA records were processed for {vector_file.name}",
+            )
 
 
 if __name__ == "__main__":
