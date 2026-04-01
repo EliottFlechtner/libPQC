@@ -1,0 +1,21 @@
+[run]
+branch = True
+source =
+    src
+omit =
+    */__init__.py
+    src/comms/*
+    src/experiments/*
+    src/app/*
+
+[report]
+show_missing = True
+skip_covered = False
+omit =
+    */__init__.py
+    src/comms/*
+    src/experiments/*
+    src/app/*
+
+[html]
+directory = coverage/html
