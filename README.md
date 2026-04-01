@@ -179,11 +179,11 @@ python3 -m unittest tests/schemes/ml_dsa/test_ml_dsa_sign.py
 Generate coverage data and reports:
 
 ```bash
-python3 -m coverage erase
-python3 -m coverage run -m unittest discover -s tests -p 'test_*.py'
-python3 -m coverage json -o coverage/coverage.json
-python3 -m coverage html -d coverage/html
-python3 -m coverage xml -o coverage/coverage.xml
+coverage erase
+coverage run -m unittest discover -s tests -p 'test_*.py'
+coverage json -o coverage/coverage.json
+coverage html -d coverage/html
+coverage xml -o coverage/coverage.xml
 python3 scripts/update_coverage_assets.py
 ```
 
