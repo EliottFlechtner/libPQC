@@ -5,7 +5,9 @@
 [![Release](https://github.com/EliottFlechtner/libPQC/actions/workflows/release.yml/badge.svg)](https://github.com/EliottFlechtner/libPQC/actions/workflows/release.yml)
 [![Coverage](coverage/badge.svg)](coverage/summary.md)
 
-Lattice-based post-quantum cryptography playground with an implementation-first core and room for protocol simulation.
+Lattice-based post-quantum cryptography playground focused on clear, testable implementations of ML-KEM and ML-DSA.
+
+Current status: first public release candidate.
 
 ## What Is Implemented Now
 
@@ -35,9 +37,19 @@ Lattice-based post-quantum cryptography playground with an implementation-first 
   - Power2Round split (`t1` public, `t0` secret)
   - hint-based signing/verification flow (`MakeHint`/`UseHint` style)
 
+## First Release Scope (v0.1.0)
+
+This first release ships a working, tested, educational implementation of:
+
+- ML-KEM: keygen, encaps, decaps
+- ML-DSA: keygen, sign, verify
+- deterministic seed-driven flows for reproducible tests
+- extensive unit and integration tests
+- CI automation for multi-Python validation and release packaging
+
 ## Current Scope
 
-This repository currently includes a working ML-KEM implementation (`keygen`/`encaps`/`decaps`) and an ML-DSA implementation (`keygen`/`sign`/`verify`). Communication and experiment modules are still scaffolded.
+`src/schemes/ml_kem` and `src/schemes/ml_dsa` are the active focus. Communication/protocol simulation modules remain scaffolded and are planned for future iterations.
 
 ## Project Layout
 
@@ -95,7 +107,14 @@ tests/
 python3 scratch.py
 ```
 
-### 2. Use the PKE API directly
+### 2. Run scheme-specific demos
+
+```bash
+python3 demos/ml_kem_demo.py
+python3 demos/ml_dsa_demo.py
+```
+
+### 3. Use the PKE API directly
 
 ```python
 from src.schemes.ml_kem.kyber_pke import (
@@ -140,6 +159,12 @@ Run integration-style tests:
 python3 -m unittest discover -s tests/integration -p 'test_*.py'
 ```
 
+Run a single scheme test module while iterating:
+
+```bash
+python3 -m unittest tests/schemes/ml_dsa/test_ml_dsa_sign.py
+```
+
 ## Coverage
 
 Generate coverage data and reports:
@@ -159,6 +184,21 @@ Useful outputs:
 - `coverage/html/index.html`
 - `coverage/badge.svg`
 
+## Release Process
+
+This repo includes a release workflow in `.github/workflows/release.yml`.
+
+For a tag release:
+
+```bash
+git checkout main
+git pull --ff-only
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The workflow runs tests and publishes a source tarball in GitHub Releases.
+
 ## Design Notes
 
 - Imports should use the canonical `src.*` paths.
@@ -167,8 +207,18 @@ Useful outputs:
 
 ## Near-Term Roadmap
 
-- tighten coverage around remaining branch-heavy paths
-- continue integrating scheme code with `comms` and `experiments` modules
+Implemented in this release:
+
+- fully working ML-KEM and ML-DSA core flows
+- high coverage and CI automation
+- deterministic demo scripts for quick validation
+
+Next priorities:
+
+- vector-based conformance checks against official KATs
+- performance profiling and optional optimized paths
+- richer protocol-level examples (key exchange + signed channel skeleton)
+- API stabilization and packaging improvements
 
 ## License
 
