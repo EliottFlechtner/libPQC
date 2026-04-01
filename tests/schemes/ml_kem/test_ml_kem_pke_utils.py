@@ -22,6 +22,7 @@ from src.schemes.ml_kem.pke_utils import (
     compress_polynomial,
     decompress_module_element,
     decompress_polynomial,
+    validate_params,
 )
 
 
@@ -37,6 +38,10 @@ class TestMlKemPkeUtils(unittest.TestCase):
             _ = compress_coefficient(1, self.q, 0)
         with self.assertRaises(ValueError):
             _ = decompress_coefficient(1, self.q, 0)
+
+    def test_validate_params_missing_required_raises(self):
+        with self.assertRaises(ValueError):
+            validate_params({"q": 3329})
 
     def test_compress_decompress_polynomial_roundtrip_shape(self):
         poly = self.rq.polynomial(list(range(self.n)))

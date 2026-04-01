@@ -8,7 +8,7 @@ and tests error handling for edge cases.
 import unittest
 
 from src.core import integers, module, polynomials, serialization
-from src.schemes.ml_dsa.keygen import ml_dsa_keygen
+from src.schemes.ml_dsa.keygen import keygen, ml_dsa_keygen
 from src.schemes.ml_dsa.params import ML_DSA_44, ML_DSA_65, ML_DSA_87
 from src.schemes.ml_dsa.sign_verify_utils import (
     expand_a,
@@ -203,6 +203,11 @@ class TestMlDsaKeygenSimplified(unittest.TestCase):
         self.assertTrue(
             len(set(vks)) > 1 or len(set(sks)) > 1, "Random keys should have diversity"
         )
+
+    def test_keygen_alias_wrapper(self):
+        vk, sk = keygen("ML-DSA-44", aseed=b"alias-wrapper")
+        self.assertIsInstance(vk, bytes)
+        self.assertIsInstance(sk, bytes)
 
 
 if __name__ == "__main__":

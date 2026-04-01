@@ -73,6 +73,19 @@ class TestSchemeUtils(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = mat_vec_add([[1]], [2, 3], [4], 0)
 
+    def test_mat_vec_add_validation_errors_and_empty(self):
+        with self.assertRaises(TypeError):
+            _ = mat_vec_add("bad", [1], [2], 0)  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            _ = mat_vec_add([[1]], "bad", [2], 0)  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            _ = mat_vec_add([[1]], [1], "bad", 0)  # type: ignore[arg-type]
+        with self.assertRaises(ValueError):
+            _ = mat_vec_add([[1], [2]], [1], [0], 0)
+        self.assertEqual(mat_vec_add([], [], [], 0), [])
+        with self.assertRaises(TypeError):
+            _ = mat_vec_add([1], [1], [0], 0)  # type: ignore[list-item]
+
     def test_inner_product_entries(self):
         self.assertEqual(inner_product_entries([1, 2], [3, 4], 0), 11)
 

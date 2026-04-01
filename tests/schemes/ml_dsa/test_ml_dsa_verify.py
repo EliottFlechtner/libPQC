@@ -6,6 +6,7 @@ and checks error handling for malformed payloads.
 """
 
 import unittest
+from unittest.mock import patch
 
 from src.core import serialization
 from src.schemes.ml_dsa.keygen import ml_dsa_keygen
@@ -181,6 +182,115 @@ class TestMlDsaVerifySimplified(unittest.TestCase):
         # Same-parameter verification should pass
         self.assertTrue(ml_dsa_verify(msg, sig44, vk44, params="44"))
         self.assertTrue(ml_dsa_verify(msg, sig87, vk87, params="87"))
+
+    def test_verify_input_type_validation(self):
+        vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"verify-type-check")
+        sig = ml_dsa_sign(b"msg", sk, rnd=b"rnd")
+        with self.assertRaises(TypeError):
+            _ = ml_dsa_verify(123, sig, vk)  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            _ = ml_dsa_verify(b"msg", "bad", vk)  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            _ = ml_dsa_verify(b"msg", sig, "bad")  # type: ignore[arg-type]
+
+    def test_verify_missing_fields_raise(self):
+        vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"verify-missing-fields")
+        sig = ml_dsa_sign(b"msg", sk, rnd=b"rnd")
+        sig_obj = serialization.from_bytes(sig)
+        vk_obj = serialization.from_bytes(vk)
+
+        for field in ["c_tilde", "z", "h"]:
+            with self.subTest(sig_field=field):
+                bad_sig = dict(sig_obj)
+                bad_sig.pop(field, None)
+                with self.assertRaises(ValueError):
+                    _ = ml_dsa_verify(b"msg", serialization.to_bytes(bad_sig), vk)
+
+        for field in ["rho", "t1"]:
+            with self.subTest(vk_field=field):
+                bad_vk = dict(vk_obj)
+                bad_vk.pop(field, None)
+                with self.assertRaises(ValueError):
+                    _ = ml_dsa_verify(b"msg", sig, serialization.to_bytes(bad_vk))
+
+    def test_verify_rejects_missing_params_in_vkey(self):
+        vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"verify-missing-params")
+        sig = ml_dsa_sign(b"msg", sk, rnd=b"rnd")
+        vk_obj = serialization.from_bytes(vk)
+        vk_obj.pop("params", None)
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_verify(b"msg", sig, serialization.to_bytes(vk_obj))
+
+    def test_verify_rejects_rank_or_degree_mismatch(self):
+        vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"verify-rank-degree")
+        sig = ml_dsa_sign(b"msg", sk, rnd=b"rnd")
+        sig_obj = serialization.from_bytes(sig)
+        vk_obj = serialization.from_bytes(vk)
+
+        bad_z = dict(sig_obj["z"])
+        bad_z["rank"] = bad_z["rank"] - 1
+        bad_z["entries"] = bad_z["entries"][:-1]
+        bad_sig_rank = dict(sig_obj)
+        bad_sig_rank["z"] = bad_z
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_verify(b"msg", serialization.to_bytes(bad_sig_rank), vk)
+
+        bad_z_degree = dict(sig_obj["z"])
+        bad_z_degree["degree"] = 128
+        bad_sig_degree = dict(sig_obj)
+        bad_sig_degree["z"] = bad_z_degree
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_verify(b"msg", serialization.to_bytes(bad_sig_degree), vk)
+
+        bad_t1 = dict(vk_obj["t1"])
+        bad_t1["rank"] = bad_t1["rank"] - 1
+        bad_t1["entries"] = bad_t1["entries"][:-1]
+        bad_vk_t1 = dict(vk_obj)
+        bad_vk_t1["t1"] = bad_t1
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_verify(b"msg", sig, serialization.to_bytes(bad_vk_t1))
+
+    def test_verify_returns_false_for_norm_and_hint_bounds(self):
+        vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"verify-bounds")
+        sig = ml_dsa_sign(b"msg", sk, rnd=b"rnd")
+        sig_obj = serialization.from_bytes(sig)
+
+        high_norm_sig = dict(sig_obj)
+        z_payload = dict(high_norm_sig["z"])
+        entries = [list(row) for row in z_payload["entries"]]
+        entries[0][0] = 131072  # gamma1 for ML-DSA-87, >= gamma1-beta threshold
+        z_payload["entries"] = entries
+        high_norm_sig["z"] = z_payload
+        self.assertFalse(
+            ml_dsa_verify(b"msg", serialization.to_bytes(high_norm_sig), vk)
+        )
+
+        high_hint_sig = dict(sig_obj)
+        h_payload = dict(high_hint_sig["h"])
+        h_entries = [list(row) for row in h_payload["entries"]]
+        for row in h_entries:
+            for i in range(min(32, len(row))):
+                row[i] = 1
+        h_payload["entries"] = h_entries
+        high_hint_sig["h"] = h_payload
+        self.assertFalse(
+            ml_dsa_verify(b"msg", serialization.to_bytes(high_hint_sig), vk)
+        )
+
+    def test_verify_rejects_matrix_dimension_mismatch(self):
+        vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"verify-a-shape")
+        sig = ml_dsa_sign(b"msg", sk, rnd=b"rnd")
+
+        with patch("src.schemes.ml_dsa.verify.expand_a", return_value=[]):
+            with self.assertRaises(ValueError):
+                _ = ml_dsa_verify(b"msg", sig, vk)
+
+    def test_verify_rejects_when_module_norm_is_too_large(self):
+        vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"verify-norm-branch")
+        sig = ml_dsa_sign(b"msg", sk, rnd=b"rnd")
+
+        with patch("src.schemes.ml_dsa.verify.module_inf_norm", return_value=10**9):
+            self.assertFalse(ml_dsa_verify(b"msg", sig, vk))
 
 
 if __name__ == "__main__":

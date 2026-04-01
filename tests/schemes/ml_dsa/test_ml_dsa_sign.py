@@ -6,6 +6,7 @@ handling for invalid inputs.
 """
 
 import unittest
+from unittest.mock import patch
 
 from src.core import integers, module, polynomials, serialization
 from src.schemes.ml_dsa.keygen import ml_dsa_keygen
@@ -110,6 +111,12 @@ class TestMlDsaSignSimplified(unittest.TestCase):
         self.assertTrue(ml_dsa_verify(msg_str, sig_str, vk))
         self.assertTrue(ml_dsa_verify(msg_bytearray, sig_bytearray, vk))
 
+    def test_sign_with_exact_32_byte_rnd_branch(self):
+        vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"rnd-32-test")
+        rnd_32 = b"r" * 32
+        sig = ml_dsa_sign(b"hello", sk, rnd=rnd_32)
+        self.assertTrue(ml_dsa_verify(b"hello", sig, vk))
+
     def test_sign_different_messages_different_sigs(self):
         """Test different messages produce different signatures."""
         vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"diff-msgs")
@@ -211,6 +218,61 @@ class TestMlDsaSignSimplified(unittest.TestCase):
         except RuntimeError as e:
             # This is expected with very small max_iterations
             self.assertIn("failed to sample", str(e))
+
+    def test_sign_input_type_validation(self):
+        _, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"sign-type-check")
+        with self.assertRaises(TypeError):
+            _ = ml_dsa_sign(123, sk)  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            _ = ml_dsa_sign("msg", "bad-key")  # type: ignore[arg-type]
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_sign("msg", sk, max_iterations=0)
+
+    def test_sign_missing_key_fields_raise(self):
+        _, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"sign-missing-fields")
+        sk_obj = serialization.from_bytes(sk)
+
+        for field in ["rho", "K", "tr", "s1", "s2", "t0"]:
+            with self.subTest(field=field):
+                bad = dict(sk_obj)
+                bad.pop(field, None)
+                with self.assertRaises(ValueError):
+                    _ = ml_dsa_sign("msg", serialization.to_bytes(bad))
+
+    def test_sign_rejects_missing_params_in_key(self):
+        _, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"sign-missing-params")
+        sk_obj = serialization.from_bytes(sk)
+        sk_obj.pop("params", None)
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_sign("msg", serialization.to_bytes(sk_obj))
+
+    def test_sign_rejects_rank_mismatch_in_secret_vectors(self):
+        _, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"sign-rank-mismatch")
+        sk_obj = serialization.from_bytes(sk)
+
+        for field in ["s1", "s2", "t0"]:
+            with self.subTest(field=field):
+                bad = dict(sk_obj)
+                payload = dict(bad[field])
+                payload["rank"] = payload["rank"] - 1
+                payload["entries"] = payload["entries"][:-1]
+                bad[field] = payload
+                with self.assertRaises(ValueError):
+                    _ = ml_dsa_sign("msg", serialization.to_bytes(bad))
+
+    def test_sign_rejects_matrix_dimension_mismatch(self):
+        _, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"sign-a-shape")
+
+        with patch("src.schemes.ml_dsa.sign.expand_a", return_value=[]):
+            with self.assertRaises(ValueError):
+                _ = ml_dsa_sign("msg", sk)
+
+        with patch(
+            "src.schemes.ml_dsa.sign.expand_a",
+            return_value=[[0], [0], [0], [0], [0], [0], [0], [0]],
+        ):
+            with self.assertRaises(ValueError):
+                _ = ml_dsa_sign("msg", sk)
 
 
 if __name__ == "__main__":
