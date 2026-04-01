@@ -16,14 +16,13 @@ Hash interfaces used here:
 When `aseed` is provided, keygen randomness is made deterministic from `aseed`.
 """
 
-from contextlib import contextmanager
-from typing import Any, Dict, Iterator, Tuple
+from typing import Any, Dict, Tuple
 
 from src.core import sampling, serialization
 from src.schemes.utils import to_seed_bytes
 
 from .kyber_pke import kyber_pke_keygen
-from .hashes import G, H, J
+from .hashes import G, H
 
 MlKemParams = Dict[str, Any] | str
 
@@ -39,36 +38,17 @@ def _deterministic_bytes(aseed: bytes, label: bytes, size: int) -> bytes:
     return out[:size]
 
 
-@contextmanager
-def _patched_sampling_random_seed(aseed: bytes) -> Iterator[None]:
-    """Temporarily patch sampling.random_seed for deterministic keygen entropy."""
-    original_random_seed = sampling.random_seed
-
-    def deterministic_random_seed(
-        num_bytes: int = sampling.DEFAULT_SEED_BYTES,
-    ) -> bytes:
-        if not isinstance(num_bytes, int):
-            raise TypeError("num_bytes must be an integer")
-        if num_bytes <= 0:
-            raise ValueError("num_bytes must be positive")
-        return _deterministic_bytes(aseed, b"random-seed", num_bytes)
-
-    sampling.random_seed = deterministic_random_seed
-    try:
-        yield
-    finally:
-        sampling.random_seed = original_random_seed
-
-
 def ml_kem_keygen(
     params: MlKemParams,
     aseed: bytes | str | None = None,
+    zseed: bytes | str | None = None,
 ) -> Tuple[bytes, bytes]:
     """Generate ML-KEM encapsulation and decapsulation keys.
 
     Args:
         params: ML-KEM parameter preset name or explicit parameter dictionary.
         aseed: Optional seed material. If provided, randomness is deterministic.
+        zseed: Optional explicit 32-byte value for `z` in deterministic mode.
 
     Returns:
         tuple[bytes, bytes]: `(ek, dk)` where:
@@ -80,13 +60,25 @@ def ml_kem_keygen(
         ValueError: If `aseed` is provided but empty.
     """
     if aseed is None:
+        if zseed is not None:
+            raise ValueError("zseed requires deterministic aseed")
         pke_public_key, pke_secret_key = kyber_pke_keygen(params)
         z = sampling.random_seed(32)
     else:
         seed = to_seed_bytes(aseed)
-        with _patched_sampling_random_seed(seed):
-            pke_public_key, pke_secret_key = kyber_pke_keygen(params)
-        z = J(b"ml-kem-z|" + seed)
+        if len(seed) == 32:
+            d = seed
+        else:
+            d = _deterministic_bytes(seed, b"d", 32)
+
+        pke_public_key, pke_secret_key = kyber_pke_keygen(params, d=d)
+
+        if zseed is None:
+            z = _deterministic_bytes(seed, b"z", 32)
+        else:
+            z = to_seed_bytes(zseed, field_name="zseed")
+            if len(z) != 32:
+                raise ValueError("zseed must be exactly 32 bytes")
 
     pk_payload = serialization.from_bytes(pke_public_key)
     sk_payload = serialization.from_bytes(pke_secret_key)

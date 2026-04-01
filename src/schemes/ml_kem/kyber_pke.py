@@ -182,6 +182,7 @@ from src.schemes.utils import (
     inner_product_entries,
     mat_vec_add,
 )
+from .hashes import G
 from .vectors import expand_matrix_a
 from .pke_utils import (
     resolve_params,
@@ -196,7 +197,10 @@ from .pke_utils import (
 from typing import Dict, Any, Tuple
 
 
-def kyber_pke_keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
+def kyber_pke_keygen(
+    params: Dict[str, Any] | str,
+    d: bytes | None = None,
+) -> Tuple[bytes, bytes]:
     """Generate a Kyber-PKE keypair (pk, sk).
 
     Implements the Kyber-PKE.KeyGen algorithm as standardized in NIST FIPS 203:
@@ -247,14 +251,21 @@ def kyber_pke_keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
     # Create k-dimensional module over R_q for vectors
     R_q_module_k = module.Module(R_q, rank=k)
 
-    # Derive deterministic seeds from master seed using domain separation
-    master_seed = sampling.random_seed(32)
-    rho = sampling.derive_seed(
-        master_seed, "kyber-pke-rho", 32
-    )  # public seed for A expansion
-    sigma = sampling.derive_seed(
-        master_seed, "kyber-pke-sigma", 32
-    )  # secret seed for deterministic sampling
+    # Derive deterministic seeds.
+    # If d is supplied, follow the ML-KEM keygen split rho||sigma = G(d).
+    if d is None:
+        master_seed = sampling.random_seed(32)
+        rho = sampling.derive_seed(master_seed, "kyber-pke-rho", 32)
+        sigma = sampling.derive_seed(master_seed, "kyber-pke-sigma", 32)
+    else:
+        if not isinstance(d, (bytes, bytearray)):
+            raise TypeError("d must be bytes-like")
+        d_bytes = bytes(d)
+        if len(d_bytes) != 32:
+            raise ValueError("d must be exactly 32 bytes")
+        g_out = G(d_bytes + bytes([k]))
+        rho = g_out[:32]
+        sigma = g_out[32:64]
 
     # Create deterministic RNGs for reproducible secret/error sampling
     rng_s, rng_e = derive_deterministic_rngs(sigma, labels=("s", "e"))

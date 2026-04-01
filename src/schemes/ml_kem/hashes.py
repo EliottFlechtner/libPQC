@@ -7,7 +7,7 @@ This module centralizes the three hash interfaces used across the ML-KEM code:
 - J: * -> 256 bits
 """
 
-from hashlib import sha3_256, sha3_512
+from hashlib import sha3_256, sha3_512, shake_256
 from typing import Tuple
 
 
@@ -22,14 +22,14 @@ def H(data: bytes) -> bytes:
     """Hash function H: maps arbitrary bytes to 32 bytes (256 bits)."""
     if not isinstance(data, (bytes, bytearray)):
         raise TypeError("data must be bytes-like")
-    return sha3_256(b"H|" + bytes(data)).digest()
+    return sha3_256(bytes(data)).digest()
 
 
 def J(data: bytes) -> bytes:
     """Hash function J: maps arbitrary bytes to 32 bytes (256 bits)."""
     if not isinstance(data, (bytes, bytearray)):
         raise TypeError("data must be bytes-like")
-    return sha3_256(b"J|" + bytes(data)).digest()
+    return shake_256(bytes(data)).digest(32)
 
 
 def derive_k_r(message: bytes, h_ek: bytes) -> Tuple[bytes, bytes]:
