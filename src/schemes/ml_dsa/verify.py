@@ -1,7 +1,6 @@
 """ML-DSA signature verification."""
 
 from src.core import integers, module, polynomials, serialization
-from src.schemes.utils import mat_vec_add
 
 from .sign_verify_utils import (
     MlDsaParams,
@@ -9,7 +8,9 @@ from .sign_verify_utils import (
     expand_a,
     hint_ones_count,
     hash_shake_bits,
+    mat_vec_add_ahat,
     module_inf_norm,
+    pack_t1,
     resolve_ml_dsa_sign_params,
     sample_in_ball,
     use_hint_module,
@@ -118,11 +119,12 @@ def ml_dsa_verify(
         return False
 
     zeros_k = [r_q.zero() for _ in range(k)]
-    az_entries = mat_vec_add(
+    az_entries = mat_vec_add_ahat(
         matrix=a_matrix,
         vector_entries=z.entries,
         add_entries=zeros_k,
-        zero_element=r_q.zero(),
+        q=q,
+        n=n,
     )
     az = rk_module.element(az_entries)
 
@@ -134,11 +136,16 @@ def ml_dsa_verify(
         alpha=alpha,
     )
 
-    t_bytes = serialization.to_bytes(t1_payload)
+    t_bytes = pack_t1(t1)
     tr = hash_shake_bits(rho + t_bytes, 512)
     mu = hash_shake_bits(tr + message_bytes, 512)
     w1_prime_payload = serialization.module_element_to_dict(w1_prime)
-    c_expected = challenge_digest(mu, w1_prime_payload, lambda_bits=lambda_bits)
+    c_expected = challenge_digest(
+        mu,
+        w1_prime_payload,
+        lambda_bits=lambda_bits,
+        gamma2=gamma2,
+    )
 
     return c_expected == c_tilde
 

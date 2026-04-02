@@ -13,6 +13,8 @@ from src.schemes.ml_dsa.params import ML_DSA_44, ML_DSA_65, ML_DSA_87
 from src.schemes.ml_dsa.sign_verify_utils import (
     expand_a,
     hash_shake_bits,
+    mat_vec_add_ahat,
+    pack_t1,
     power2round_module,
 )
 
@@ -78,13 +80,13 @@ class TestMlDsaKeygenSimplified(unittest.TestCase):
         rho = bytes.fromhex(vk_obj["rho"])
         a_matrix = expand_a(rho, r_q, k=k, l=l)
 
-        t_recomputed_entries = []
-        for i in range(k):
-            acc = r_q.zero()
-            for j in range(l):
-                acc = acc + (a_matrix[i][j] * s1.entries[j])
-            t_recomputed_entries.append(acc + s2.entries[i])
-
+        t_recomputed_entries = mat_vec_add_ahat(
+            matrix=a_matrix,
+            vector_entries=s1.entries,
+            add_entries=s2.entries,
+            q=q,
+            n=n,
+        )
         t_recomputed = r_q_k.element(t_recomputed_entries)
         t1_recomputed, t0_recomputed = power2round_module(t_recomputed, r_q_k, d=d)
 
@@ -98,7 +100,8 @@ class TestMlDsaKeygenSimplified(unittest.TestCase):
         sk_obj = serialization.from_bytes(sk)
 
         rho = bytes.fromhex(vk_obj["rho"])
-        t_bytes = serialization.to_bytes(vk_obj["t1"])
+        t1 = serialization.module_element_from_dict(vk_obj["t1"])
+        t_bytes = pack_t1(t1)
         expected_tr = hash_shake_bits(rho + t_bytes, 512).hex()
         self.assertEqual(sk_obj["tr"], expected_tr)
 

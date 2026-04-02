@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_c0b599ce0f8be8c8_keygen_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.13.5">coverage.py v7.13.5</a>,
-            created at 2026-04-01 02:53 +0000
+            created at 2026-04-02 02:14 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -91,7 +91,7 @@
     <p class="pln"><span class="n"><a id="t7" href="#t7">7</a></span><span class="t"><span class="str">- J: * -> 256 bits</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t8" href="#t8">8</a></span><span class="t"><span class="str">"""</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t9" href="#t9">9</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t10" href="#t10">10</a></span><span class="t"><span class="key">from</span> <span class="nam">hashlib</span> <span class="key">import</span> <span class="nam">sha3_256</span><span class="op">,</span> <span class="nam">sha3_512</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t10" href="#t10">10</a></span><span class="t"><span class="key">from</span> <span class="nam">hashlib</span> <span class="key">import</span> <span class="nam">sha3_256</span><span class="op">,</span> <span class="nam">sha3_512</span><span class="op">,</span> <span class="nam">shake_256</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t11" href="#t11">11</a></span><span class="t"><span class="key">from</span> <span class="nam">typing</span> <span class="key">import</span> <span class="nam">Tuple</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t12" href="#t12">12</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t13" href="#t13">13</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -106,14 +106,14 @@
     <p class="pln"><span class="n"><a id="t22" href="#t22">22</a></span><span class="t">    <span class="str">"""Hash function H: maps arbitrary bytes to 32 bytes (256 bits)."""</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t">    <span class="key">if</span> <span class="key">not</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">data</span><span class="op">,</span> <span class="op">(</span><span class="nam">bytes</span><span class="op">,</span> <span class="nam">bytearray</span><span class="op">)</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t">        <span class="key">raise</span> <span class="nam">TypeError</span><span class="op">(</span><span class="str">"data must be bytes-like"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t">    <span class="key">return</span> <span class="nam">sha3_256</span><span class="op">(</span><span class="str">b"H|"</span> <span class="op">+</span> <span class="nam">bytes</span><span class="op">(</span><span class="nam">data</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="nam">digest</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t">    <span class="key">return</span> <span class="nam">sha3_256</span><span class="op">(</span><span class="nam">bytes</span><span class="op">(</span><span class="nam">data</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="nam">digest</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t28" href="#t28">28</a></span><span class="t"><span class="key">def</span> <span class="nam">J</span><span class="op">(</span><span class="nam">data</span><span class="op">:</span> <span class="nam">bytes</span><span class="op">)</span> <span class="op">-></span> <span class="nam">bytes</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t29" href="#t29">29</a></span><span class="t">    <span class="str">"""Hash function J: maps arbitrary bytes to 32 bytes (256 bits)."""</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t">    <span class="key">if</span> <span class="key">not</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">data</span><span class="op">,</span> <span class="op">(</span><span class="nam">bytes</span><span class="op">,</span> <span class="nam">bytearray</span><span class="op">)</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t31" href="#t31">31</a></span><span class="t">        <span class="key">raise</span> <span class="nam">TypeError</span><span class="op">(</span><span class="str">"data must be bytes-like"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t">    <span class="key">return</span> <span class="nam">sha3_256</span><span class="op">(</span><span class="str">b"J|"</span> <span class="op">+</span> <span class="nam">bytes</span><span class="op">(</span><span class="nam">data</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="nam">digest</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t">    <span class="key">return</span> <span class="nam">shake_256</span><span class="op">(</span><span class="nam">bytes</span><span class="op">(</span><span class="nam">data</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="nam">digest</span><span class="op">(</span><span class="num">32</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t33" href="#t33">33</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t"><span class="key">def</span> <span class="nam">derive_k_r</span><span class="op">(</span><span class="nam">message</span><span class="op">:</span> <span class="nam">bytes</span><span class="op">,</span> <span class="nam">h_ek</span><span class="op">:</span> <span class="nam">bytes</span><span class="op">)</span> <span class="op">-></span> <span class="nam">Tuple</span><span class="op">[</span><span class="nam">bytes</span><span class="op">,</span> <span class="nam">bytes</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
@@ -148,7 +148,7 @@
             <a class="nav" href="z_c0b599ce0f8be8c8_keygen_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.13.5">coverage.py v7.13.5</a>,
-            created at 2026-04-01 02:53 +0000
+            created at 2026-04-02 02:14 +0000
         </p>
     </div>
 </footer>

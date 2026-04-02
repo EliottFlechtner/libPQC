@@ -11,6 +11,7 @@ from src.core import serialization
 
 from .hashes import H, J, derive_k_r
 from .kyber_pke import kyber_pke_decryption, kyber_pke_encryption
+from .pke_utils import encode_public_key_bytes
 
 MlKemParams = Dict[str, Any] | str
 
@@ -78,8 +79,21 @@ def ml_kem_decaps(
         return fallback_k
 
     # Step 2: (K', R') = G(m', H(ek)).
-    ek_bytes = serialization.to_bytes(ek_payload)
-    h_ek = H(ek_bytes)
+    rho_value = ek_payload.get("rho")
+    t_value = ek_payload.get("t")
+    if not isinstance(rho_value, str) or not isinstance(t_value, dict):
+        raise ValueError("encapsulation key payload is malformed")
+
+    try:
+        pk_bytes = encode_public_key_bytes(
+            rho_hex=rho_value,
+            t_payload=t_value,
+            params=params,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("encapsulation key payload is malformed") from exc
+
+    h_ek = H(pk_bytes)
     stored_h_ek = bytes.fromhex(h_ek_hex)
     if len(stored_h_ek) != 32:
         raise ValueError("h_ek must be exactly 32 bytes")

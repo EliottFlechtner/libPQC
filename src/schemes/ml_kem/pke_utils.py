@@ -15,6 +15,83 @@ REQUIRED_PARAMS = ("q", "n", "k", "eta1", "eta2", "du", "dv")
 PKE_MESSAGE_BYTES = 32
 
 
+def pack_bits_le(values: list[int], bits: int) -> bytes:
+    """Pack fixed-width integers into a little-endian bitstream."""
+    if bits <= 0:
+        raise ValueError("bits must be positive")
+    mask = (1 << bits) - 1
+
+    out = bytearray()
+    acc = 0
+    acc_bits = 0
+    for value in values:
+        v = int(value)
+        if v < 0 or v > mask:
+            raise ValueError(f"value {v} does not fit in {bits} bits")
+        acc |= v << acc_bits
+        acc_bits += bits
+        while acc_bits >= 8:
+            out.append(acc & 0xFF)
+            acc >>= 8
+            acc_bits -= 8
+
+    if acc_bits:
+        out.append(acc & 0xFF)
+
+    return bytes(out)
+
+
+def encode_polyvec_12(entries: list[list[int]], degree: int) -> bytes:
+    """Encode a vector of degree-`degree` polynomials with 12-bit coefficients."""
+    packed = bytearray()
+    for coeffs in entries:
+        if len(coeffs) > degree:
+            raise ValueError("polynomial degree mismatch in polyvec encoding")
+        # Serialized quotient polynomials may omit trailing zeros. Normalize to
+        # the fixed Kyber degree before bit-packing.
+        normalized = [int(c) for c in coeffs]
+        if len(normalized) < degree:
+            normalized.extend([0] * (degree - len(normalized)))
+        packed.extend(pack_bits_le(normalized, 12))
+    return bytes(packed)
+
+
+def encode_public_key_bytes(
+    rho_hex: str, t_payload: dict, params: Dict[str, Any] | str
+) -> bytes:
+    """Encode ML-KEM public key bytes as `byte_encode_12(t_hat) || rho`.
+
+    This is the canonical form used in KAT vectors for `pk` and for `H(pk)`.
+    """
+    if not isinstance(rho_hex, str):
+        raise TypeError("rho_hex must be a hex string")
+    if not isinstance(t_payload, dict):
+        raise TypeError("t_payload must be a dictionary")
+
+    resolved = resolve_params(params)
+    k = resolved["k"]
+    n = resolved["n"]
+
+    if t_payload.get("type") != "module_element":
+        raise ValueError("t payload must be a module_element")
+    if t_payload.get("rank") != k:
+        raise ValueError("t payload rank mismatch")
+    if t_payload.get("degree") != n:
+        raise ValueError("t payload degree mismatch")
+
+    entries = t_payload.get("entries")
+    if not isinstance(entries, list) or len(entries) != k:
+        raise ValueError("t payload entries mismatch")
+
+    parsed_entries: list[list[int]] = []
+    for coeffs in entries:
+        if not isinstance(coeffs, list):
+            raise ValueError("t payload polynomial entry must be a list")
+        parsed_entries.append([int(c) for c in coeffs])
+
+    return encode_polyvec_12(parsed_entries, degree=n) + bytes.fromhex(rho_hex)
+
+
 def compress_coefficient(value: int, q: int, bits: int) -> int:
     """Compress one coefficient from Z_q to an integer in [0, 2^bits).
 
@@ -379,6 +456,9 @@ def poly_to_message(poly: polynomials.QuotientPolynomial) -> bytes:
 
 
 __all__ = [
+    "pack_bits_le",
+    "encode_polyvec_12",
+    "encode_public_key_bytes",
     "resolve_params",
     "validate_params",
     "message_to_poly",

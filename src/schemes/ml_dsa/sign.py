@@ -9,7 +9,7 @@ Flow (spec-style):
 """
 
 from src.core import integers, module, polynomials, serialization
-from src.schemes.utils import mat_vec_add, to_seed_bytes
+from src.schemes.utils import to_seed_bytes
 
 from .sign_verify_utils import (
     MlDsaParams,
@@ -21,6 +21,7 @@ from .sign_verify_utils import (
     low_bits_module,
     low_bits_sufficiently_small,
     make_hint_payload,
+    mat_vec_add_ahat,
     module_inf_norm,
     resolve_ml_dsa_sign_params,
     sample_in_ball,
@@ -165,11 +166,12 @@ def ml_dsa_sign(
         y = expand_mask(rho_2prime, rql_module, gamma1=gamma1, kappa=kappa)
 
         # Step 2: Compute w = A * y (matrix-vector product)
-        w_entries = mat_vec_add(
+        w_entries = mat_vec_add_ahat(
             matrix=a_matrix,
             vector_entries=y.entries,
             add_entries=zeros_k,
-            zero_element=r_q.zero(),
+            q=q,
+            n=n,
         )
         w = rk_module.element(w_entries)
 
@@ -180,7 +182,12 @@ def ml_dsa_sign(
         # Step 4: Derive challenge from message and w1
         # c_tilde = H(mu || w1, 2*lambda) produces a challenge seed
         w1_payload = serialization.module_element_to_dict(w1)
-        c_tilde_try = challenge_digest(mu, w1_payload, lambda_bits=lambda_bits)
+        c_tilde_try = challenge_digest(
+            mu,
+            w1_payload,
+            lambda_bits=lambda_bits,
+            gamma2=gamma2,
+        )
 
         # Step 5: Expand challenge seed to c in B_tau (exactly tau coefficients in {+/-1})
         c_try = sample_in_ball(c_tilde_try, r_q, tau=tau)

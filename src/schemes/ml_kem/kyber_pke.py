@@ -177,11 +177,16 @@ Where:
 """
 
 from src.core import sampling, polynomials, integers, module, serialization
-from src.schemes.utils import (
-    derive_deterministic_rngs,
-    inner_product_entries,
-    mat_vec_add,
+from .hashes import G
+from .kyber_ntt import (
+    invntt_tomont,
+    ntt,
+    poly_add,
+    poly_basemul_montgomery,
+    poly_reduce,
+    poly_tomont,
 )
+from .kyber_sampling import sample_cbd_poly, sample_cbd_vector
 from .vectors import expand_matrix_a
 from .pke_utils import (
     resolve_params,
@@ -196,7 +201,10 @@ from .pke_utils import (
 from typing import Dict, Any, Tuple
 
 
-def kyber_pke_keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
+def kyber_pke_keygen(
+    params: Dict[str, Any] | str,
+    d: bytes | None = None,
+) -> Tuple[bytes, bytes]:
     """Generate a Kyber-PKE keypair (pk, sk).
 
     Implements the Kyber-PKE.KeyGen algorithm as standardized in NIST FIPS 203:
@@ -247,34 +255,55 @@ def kyber_pke_keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
     # Create k-dimensional module over R_q for vectors
     R_q_module_k = module.Module(R_q, rank=k)
 
-    # Derive deterministic seeds from master seed using domain separation
-    master_seed = sampling.random_seed(32)
-    rho = sampling.derive_seed(
-        master_seed, "kyber-pke-rho", 32
-    )  # public seed for A expansion
-    sigma = sampling.derive_seed(
-        master_seed, "kyber-pke-sigma", 32
-    )  # secret seed for deterministic sampling
-
-    # Create deterministic RNGs for reproducible secret/error sampling
-    rng_s, rng_e = derive_deterministic_rngs(sigma, labels=("s", "e"))
+    # Derive deterministic seeds.
+    # If d is supplied, follow the ML-KEM keygen split rho||sigma = G(d).
+    if d is None:
+        master_seed = sampling.random_seed(32)
+        rho = sampling.derive_seed(master_seed, "kyber-pke-rho", 32)
+        sigma = sampling.derive_seed(master_seed, "kyber-pke-sigma", 32)
+    else:
+        if not isinstance(d, (bytes, bytearray)):
+            raise TypeError("d must be bytes-like")
+        d_bytes = bytes(d)
+        if len(d_bytes) != 32:
+            raise ValueError("d must be exactly 32 bytes")
+        g_out = G(d_bytes + bytes([k]))
+        rho = g_out[:32]
+        sigma = g_out[32:64]
 
     # Step 1: Expand matrix A ∈ R_q^(k×k) deterministically from public seed rho
     A = expand_matrix_a(rho, R_q, k)
 
     # Step 2: Sample secret vector s and error vector e from centered binomial CBD_{eta1}
-    s = sampling.sample_small_vector(R_q_module_k, eta=eta1, method="cbd", rng=rng_s)
-    e = sampling.sample_small_vector(R_q_module_k, eta=eta1, method="cbd", rng=rng_e)
+    s = sample_cbd_vector(R_q, rank=k, eta=eta1, seed=sigma, nonce_start=0)
+    e = sample_cbd_vector(R_q, rank=k, eta=eta1, seed=sigma, nonce_start=k)
 
-    # Step 3: Compute public value t = A*s + e via matrix-vector multiplication
-    # Accumulate row-wise products: t_i = sum_j A_{i,j} * s_j + e_i
-    t_entries = mat_vec_add(
-        matrix=A,
-        vector_entries=s.entries,
-        add_entries=e.entries,
-        zero_element=R_q.zero(),
-    )
-    t = R_q_module_k.element(t_entries)
+    s_hat_entries = [R_q.polynomial(ntt(p.to_coefficients(n))) for p in s.entries]
+    e_hat_entries = [R_q.polynomial(ntt(p.to_coefficients(n))) for p in e.entries]
+
+    # `expand_matrix_a` returns Kyber A-hat polynomials directly.
+    a_hat: list[list[list[int]]] = []
+    for i in range(k):
+        row_hat: list[list[int]] = []
+        for j in range(k):
+            row_hat.append(A[i][j].to_coefficients(n))
+        a_hat.append(row_hat)
+
+    s_hat_coeffs = [p.to_coefficients(n) for p in s_hat_entries]
+    e_hat_coeffs = [p.to_coefficients(n) for p in e_hat_entries]
+    t_hat_entries = []
+    for i in range(k):
+        acc = [0] * n
+        for j in range(k):
+            prod = poly_basemul_montgomery(a_hat[i][j], s_hat_coeffs[j])
+            acc = poly_add(acc, prod)
+        acc = poly_tomont(acc)
+        acc = poly_add(acc, e_hat_coeffs[i])
+        acc = poly_reduce(acc)
+        t_hat_entries.append(R_q.polynomial(acc))
+
+    s_hat = R_q_module_k.element(s_hat_entries)
+    t_hat = R_q_module_k.element(t_hat_entries)
 
     # Step 4: Serialize public and secret keys as JSON
     public_payload = {
@@ -282,13 +311,13 @@ def kyber_pke_keygen(params: Dict[str, Any] | str) -> Tuple[bytes, bytes]:
         "type": "ml_kem_pke_public_key",
         "params": param_name,
         "rho": rho.hex(),  # store rho as hex string
-        "t": serialization.module_element_to_dict(t),  # serialize t as module element
+        "t": serialization.module_element_to_dict(t_hat),
     }
     secret_payload = {
         "version": 1,
         "type": "ml_kem_pke_secret_key",
         "params": param_name,
-        "s": serialization.module_element_to_dict(s),  # serialize s as module element
+        "s": serialization.module_element_to_dict(s_hat),
     }
 
     public_key = serialization.to_bytes(public_payload)
@@ -378,7 +407,7 @@ def kyber_pke_encryption(
     t_payload = pk_payload.get("t")
     if not isinstance(t_payload, dict):
         raise ValueError("public key payload missing t")
-    t = serialization.module_element_from_dict(t_payload)
+    t_hat = serialization.module_element_from_dict(t_payload)
 
     # Create the quotient ring and module for arithmetic
     zq = integers.IntegersRing(q)
@@ -386,7 +415,7 @@ def kyber_pke_encryption(
     rq_module_k = module.Module(rq, rank=k)
 
     # Validate public key rank matches parameter set
-    if t.module.rank != k:
+    if t_hat.module.rank != k:
         raise ValueError("public key rank does not match parameter set")
 
     # Step 1: Generate or validate coins for deterministic ephemeral sampling
@@ -399,46 +428,50 @@ def kyber_pke_encryption(
         if len(seed) != 32:
             raise ValueError("coins must be exactly 32 bytes")
 
-    # Step 2: Domain-split coins into independent seeds for r, e1, e2 sampling
-    rng_r, rng_e1, rng_e2 = derive_deterministic_rngs(
-        seed,
-        labels=("r", "e1", "e2"),
-    )
-
-    # Step 3: Expand matrix A^T (transpose for computing u = A^T * r)
+    # Step 3: Expand A-hat^T in NTT domain.
     a_t = expand_matrix_a(rho, rq, k, transpose=True)
 
-    # Step 4: Sample ephemeral secrets/errors using domain-separated seeds
-    r = sampling.sample_small_vector(
-        rq_module_k, eta=eta1, method="cbd", rng=rng_r
-    )  # ephemeral secret
-    e1 = sampling.sample_small_vector(
-        rq_module_k, eta=eta2, method="cbd", rng=rng_e1
-    )  # ephemeral error vector
-    e2 = sampling.sample_small_polynomial(
-        rq, eta=eta2, method="cbd", rng=rng_e2
-    )  # ephemeral error scalar
+    # Step 4: Sample ephemeral secrets/errors.
+    r = sample_cbd_vector(rq, rank=k, eta=eta1, seed=seed, nonce_start=0)
+    e1 = sample_cbd_vector(rq, rank=k, eta=eta2, seed=seed, nonce_start=k)
+    e2 = sample_cbd_poly(rq, eta=eta2, seed=seed, nonce=2 * k)
     m_poly = message_to_poly(message, rq)  # encode message with bit embedding
 
-    # Step 5: Compute u = A^T * r + e1 via matrix-vector multiplication
-    u_entries = mat_vec_add(
-        matrix=a_t,
-        vector_entries=r.entries,
-        add_entries=e1.entries,
-        zero_element=rq.zero(),
-    )
+    # Step 5: Transform sp to NTT domain.
+    r_hat = [ntt(p.to_coefficients(n)) for p in r.entries]
+
+    # Step 6: Compute b_hat = A_hat^T * r_hat in NTT domain.
+    b_hat_entries: list[list[int]] = []
+    for i in range(k):
+        acc = [0] * n
+        for j in range(k):
+            acc = poly_add(
+                acc,
+                poly_basemul_montgomery(
+                    a_t[i][j].to_coefficients(n),
+                    r_hat[j],
+                ),
+            )
+        b_hat_entries.append(acc)
+
+    # Step 7: Compute v_hat = <t_hat, r_hat> in NTT domain.
+    t_hat_entries = [p.to_coefficients(n) for p in t_hat.entries]
+    v_hat = [0] * n
+    for j in range(k):
+        v_hat = poly_add(v_hat, poly_basemul_montgomery(t_hat_entries[j], r_hat[j]))
+
+    # Step 8: Inverse transform and add noise/message in coefficient domain.
+    u_entries = []
+    for i in range(k):
+        b_coeff = invntt_tomont(b_hat_entries[i])
+        noisy_b = poly_reduce(poly_add(b_coeff, e1.entries[i].to_coefficients(n)))
+        u_entries.append(rq.polynomial(noisy_b))
     u = rq_module_k.element(u_entries)
 
-    # Step 6: Compute v = t^T * r + e2 + m_poly via inner product + encoded message
-    v = (
-        e2
-        + m_poly
-        + inner_product_entries(
-            t.entries,
-            r.entries,
-            zero_element=rq.zero(),
-        )
-    )
+    v_coeff = invntt_tomont(v_hat)
+    v_noisy = poly_add(v_coeff, e2.to_coefficients(n))
+    v_noisy = poly_add(v_noisy, m_poly.to_coefficients(n))
+    v = rq.polynomial(poly_reduce(v_noisy))
 
     # Step 7: Compress ciphertext components to drop low-order coefficient bits.
     c1 = compress_module_element(u, du)
@@ -547,18 +580,25 @@ def kyber_pke_decryption(
         u = serialization.module_element_from_dict(u_payload)  # type: ignore
         v = serialization.polynomial_from_dict(v_payload)  # type: ignore
 
-    s = serialization.module_element_from_dict(s_payload)
+    s_hat = serialization.module_element_from_dict(s_payload)
 
     # Validate ciphertext/secret key ranks match parameter set
-    if u.module.rank != k or s.module.rank != k:
+    if u.module.rank != k or s_hat.module.rank != k:
         raise ValueError("ciphertext/secret key rank does not match parameter set")
 
-    # Step 1: Compute decryption polynomial m_poly = v - s^T * u
-    # Start with v, then subtract inner product s^T * u = sum_j s_j * u_j
-    m_poly = v - inner_product_entries(
-        s.entries,
-        u.entries,
-        zero_element=rq.zero(),
+    # Decrypt with NTT-domain secret key: mp = v - invntt(<s_hat, ntt(u)>).
+    s_hat_entries = [p.to_coefficients(n) for p in s_hat.entries]
+    u_hat_entries = [ntt(p.to_coefficients(n)) for p in u.entries]
+
+    mp_hat = [0] * n
+    for j in range(k):
+        mp_hat = poly_add(
+            mp_hat,
+            poly_basemul_montgomery(s_hat_entries[j], u_hat_entries[j]),
+        )
+    mp_coeff = invntt_tomont(mp_hat)
+    m_poly = rq.polynomial(
+        poly_reduce(poly_add(v.to_coefficients(n), [-x for x in mp_coeff]))
     )
 
     # Step 2: Decode polynomial back to 32-byte message via nearest-neighbor rounding
