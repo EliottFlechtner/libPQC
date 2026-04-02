@@ -1,13 +1,275 @@
 """Shared helpers for ML-DSA signing and verification."""
 
-import random
-from hashlib import shake_256
+from hashlib import shake_128, shake_256
 from typing import Any, Dict
 
 from src.core import module, polynomials, sampling, serialization
 from src.schemes.utils import resolve_named_params
 
 from .params import ML_DSA_PARAM_SETS, MlDsaParams
+
+
+_ML_DSA_Q = 8380417
+_ML_DSA_QINV = 58728449
+_ML_DSA_N = 256
+_ML_DSA_ZETAS = [
+    0,
+    25847,
+    -2608894,
+    -518909,
+    237124,
+    -777960,
+    -876248,
+    466468,
+    1826347,
+    2353451,
+    -359251,
+    -2091905,
+    3119733,
+    -2884855,
+    3111497,
+    2680103,
+    2725464,
+    1024112,
+    -1079900,
+    3585928,
+    -549488,
+    -1119584,
+    2619752,
+    -2108549,
+    -2118186,
+    -3859737,
+    -1399561,
+    -3277672,
+    1757237,
+    -19422,
+    4010497,
+    280005,
+    2706023,
+    95776,
+    3077325,
+    3530437,
+    -1661693,
+    -3592148,
+    -2537516,
+    3915439,
+    -3861115,
+    -3043716,
+    3574422,
+    -2867647,
+    3539968,
+    -300467,
+    2348700,
+    -539299,
+    -1699267,
+    -1643818,
+    3505694,
+    -3821735,
+    3507263,
+    -2140649,
+    -1600420,
+    3699596,
+    811944,
+    531354,
+    954230,
+    3881043,
+    3900724,
+    -2556880,
+    2071892,
+    -2797779,
+    -3930395,
+    -1528703,
+    -3677745,
+    -3041255,
+    -1452451,
+    3475950,
+    2176455,
+    -1585221,
+    -1257611,
+    1939314,
+    -4083598,
+    -1000202,
+    -3190144,
+    -3157330,
+    -3632928,
+    126922,
+    3412210,
+    -983419,
+    2147896,
+    2715295,
+    -2967645,
+    -3693493,
+    -411027,
+    -2477047,
+    -671102,
+    -1228525,
+    -22981,
+    -1308169,
+    -381987,
+    1349076,
+    1852771,
+    -1430430,
+    -3343383,
+    264944,
+    508951,
+    3097992,
+    44288,
+    -1100098,
+    904516,
+    3958618,
+    -3724342,
+    -8578,
+    1653064,
+    -3249728,
+    2389356,
+    -210977,
+    759969,
+    -1316856,
+    189548,
+    -3553272,
+    3159746,
+    -1851402,
+    -2409325,
+    -177440,
+    1315589,
+    1341330,
+    1285669,
+    -1584928,
+    -812732,
+    -1439742,
+    -3019102,
+    -3881060,
+    -3628969,
+    3839961,
+    2091667,
+    3407706,
+    2316500,
+    3817976,
+    -3342478,
+    2244091,
+    -2446433,
+    -3562462,
+    266997,
+    2434439,
+    -1235728,
+    3513181,
+    -3520352,
+    -3759364,
+    -1197226,
+    -3193378,
+    900702,
+    1859098,
+    909542,
+    819034,
+    495491,
+    -1613174,
+    -43260,
+    -522500,
+    -655327,
+    -3122442,
+    2031748,
+    3207046,
+    -3556995,
+    -525098,
+    -768622,
+    -3595838,
+    342297,
+    286988,
+    -2437823,
+    4108315,
+    3437287,
+    -3342277,
+    1735879,
+    203044,
+    2842341,
+    2691481,
+    -2590150,
+    1265009,
+    4055324,
+    1247620,
+    2486353,
+    1595974,
+    -3767016,
+    1250494,
+    2635921,
+    -3548272,
+    -2994039,
+    1869119,
+    1903435,
+    -1050970,
+    -1333058,
+    1237275,
+    -3318210,
+    -1430225,
+    -451100,
+    1312455,
+    3306115,
+    -1962642,
+    -1279661,
+    1917081,
+    -2546312,
+    -1374803,
+    1500165,
+    777191,
+    2235880,
+    3406031,
+    -542412,
+    -2831860,
+    -1671176,
+    -1846953,
+    -2584293,
+    -3724270,
+    594136,
+    -3776993,
+    -2013608,
+    2432395,
+    2454455,
+    -164721,
+    1957272,
+    3369112,
+    185531,
+    -1207385,
+    -3183426,
+    162844,
+    1616392,
+    3014001,
+    810149,
+    1652634,
+    -3694233,
+    -1799107,
+    -3038916,
+    3523897,
+    3866901,
+    269760,
+    2213111,
+    -975884,
+    1717735,
+    472078,
+    -426683,
+    1723600,
+    -1803090,
+    1910376,
+    -1667432,
+    -1104333,
+    -260646,
+    -3833893,
+    -2939036,
+    -2235985,
+    -420899,
+    -2286327,
+    183443,
+    -976891,
+    1612842,
+    -3545687,
+    -554416,
+    3919660,
+    -48306,
+    -1362209,
+    3937738,
+    1400424,
+    -846154,
+    1976782,
+]
 
 
 def hash_shake_bits(data: bytes, bits: int) -> bytes:
@@ -19,6 +281,204 @@ def hash_shake_bits(data: bytes, bits: int) -> bytes:
     if bits % 8 != 0:
         raise ValueError("bits must be a multiple of 8")
     return shake_256(bytes(data)).digest(bits // 8)
+
+
+def _pack_bits_le(values: list[int], bits: int) -> bytes:
+    if bits <= 0:
+        raise ValueError("bits must be positive")
+
+    out = bytearray()
+    acc = 0
+    acc_bits = 0
+    mask = (1 << bits) - 1
+
+    for value in values:
+        v = int(value)
+        if v < 0 or v > mask:
+            raise ValueError("value out of range for bit width")
+        acc |= v << acc_bits
+        acc_bits += bits
+        while acc_bits >= 8:
+            out.append(acc & 0xFF)
+            acc >>= 8
+            acc_bits -= 8
+
+    if acc_bits:
+        out.append(acc & 0xFF)
+    return bytes(out)
+
+
+def _montgomery_reduce(value: int) -> int:
+    t = (int(value) & 0xFFFFFFFF) * _ML_DSA_QINV
+    t &= 0xFFFFFFFF
+    if t & 0x80000000:
+        t -= 0x100000000
+    return (int(value) - t * _ML_DSA_Q) >> 32
+
+
+def _caddq(value: int) -> int:
+    return int(value) + ((int(value) >> 31) & _ML_DSA_Q)
+
+
+def _ml_dsa_ntt(coeffs: list[int]) -> list[int]:
+    if len(coeffs) != _ML_DSA_N:
+        raise ValueError("NTT input must have length 256")
+    out = [int(c) for c in coeffs]
+    k = 0
+    length = 128
+    while length > 0:
+        for start in range(0, _ML_DSA_N, 2 * length):
+            k += 1
+            zeta = _ML_DSA_ZETAS[k]
+            for j in range(start, start + length):
+                t = _montgomery_reduce(zeta * out[j + length])
+                out[j + length] = out[j] - t
+                out[j] = out[j] + t
+        length >>= 1
+    return out
+
+
+def _ml_dsa_invntt_tomont(coeffs: list[int]) -> list[int]:
+    if len(coeffs) != _ML_DSA_N:
+        raise ValueError("invNTT input must have length 256")
+    out = [int(c) for c in coeffs]
+    k = 256
+    length = 1
+    f = 41978  # mont^2 / 256 from reference implementation.
+    while length < _ML_DSA_N:
+        for start in range(0, _ML_DSA_N, 2 * length):
+            k -= 1
+            zeta = -_ML_DSA_ZETAS[k]
+            for j in range(start, start + length):
+                t = out[j]
+                out[j] = t + out[j + length]
+                out[j + length] = t - out[j + length]
+                out[j + length] = _montgomery_reduce(zeta * out[j + length])
+        length <<= 1
+    for j in range(_ML_DSA_N):
+        out[j] = _montgomery_reduce(f * out[j])
+    return out
+
+
+def _poly_pointwise_montgomery(a_hat: list[int], b_hat: list[int]) -> list[int]:
+    return [_montgomery_reduce(int(a_hat[i]) * int(b_hat[i])) for i in range(_ML_DSA_N)]
+
+
+def _shake_reader(seed: bytes, *, variant: int):
+    offset = 0
+
+    def read(n: int) -> bytes:
+        nonlocal offset
+        if n <= 0:
+            return b""
+        total = offset + n
+        if variant == 128:
+            data = shake_128(seed).digest(total)
+        elif variant == 256:
+            data = shake_256(seed).digest(total)
+        else:
+            raise ValueError("unsupported SHAKE variant")
+        chunk = data[offset:total]
+        offset = total
+        return chunk
+
+    return read
+
+
+def _rej_uniform_q(seed: bytes, n: int, q: int) -> list[int]:
+    coeffs: list[int] = []
+    read = _shake_reader(seed, variant=128)
+    while len(coeffs) < n:
+        buf = read(168)
+        for i in range(0, len(buf) - 2, 3):
+            t = buf[i] | (buf[i + 1] << 8) | (buf[i + 2] << 16)
+            t &= 0x7FFFFF
+            if t < q:
+                coeffs.append(t)
+                if len(coeffs) == n:
+                    break
+    return coeffs
+
+
+def _rej_eta(seed: bytes, n: int, eta: int) -> list[int]:
+    coeffs: list[int] = []
+    read = _shake_reader(seed, variant=256)
+    while len(coeffs) < n:
+        buf = read(136)
+        for b in buf:
+            lo = b & 0x0F
+            hi = b >> 4
+            for t in (lo, hi):
+                if eta == 2:
+                    if t >= 15:
+                        continue
+                    t = t - ((205 * t) >> 10) * 5
+                    coeffs.append(2 - t)
+                elif eta == 4:
+                    if t >= 9:
+                        continue
+                    coeffs.append(4 - t)
+                else:
+                    raise ValueError("unsupported eta")
+                if len(coeffs) == n:
+                    break
+            if len(coeffs) == n:
+                break
+    return coeffs
+
+
+def _expand_mask_poly(seed: bytes, n: int, gamma1: int) -> list[int]:
+    bits = 18 if gamma1 == (1 << 17) else 20
+    mask = (1 << bits) - 1
+    need_bits = n * bits
+    need_bytes = (need_bits + 7) // 8
+    stream = shake_256(seed).digest(need_bytes)
+
+    out: list[int] = []
+    acc = 0
+    acc_bits = 0
+    idx = 0
+    while len(out) < n:
+        while acc_bits < bits:
+            acc |= stream[idx] << acc_bits
+            idx += 1
+            acc_bits += 8
+        t = acc & mask
+        acc >>= bits
+        acc_bits -= bits
+        out.append(gamma1 - t)
+    return out
+
+
+def pack_w1(module_element: module.ModuleElement, gamma2: int) -> bytes:
+    """Pack w1 coefficients to the byte layout used in challenge hashing."""
+    n = module_element.module.quotient_ring.degree
+    packed = bytearray()
+    if gamma2 == 95232:
+        # Values are in [0, 43], packed on 6 bits.
+        for entry in module_element.entries:
+            coeffs = [int(c) & 0x3F for c in entry.to_coefficients(n)]
+            packed.extend(_pack_bits_le(coeffs, 6))
+        return bytes(packed)
+
+    if gamma2 == 261888:
+        # Values are in [0, 15], packed on 4 bits.
+        for entry in module_element.entries:
+            coeffs = [int(c) & 0x0F for c in entry.to_coefficients(n)]
+            packed.extend(_pack_bits_le(coeffs, 4))
+        return bytes(packed)
+
+    raise ValueError("unsupported gamma2 for w1 packing")
+
+
+def pack_t1(module_element: module.ModuleElement) -> bytes:
+    """Pack t1 coefficients on 10 bits per coefficient."""
+    n = module_element.module.quotient_ring.degree
+    packed = bytearray()
+    for entry in module_element.entries:
+        coeffs = [int(c) & 0x3FF for c in entry.to_coefficients(n)]
+        packed.extend(_pack_bits_le(coeffs, 10))
+    return bytes(packed)
 
 
 def resolve_ml_dsa_sign_params(params: MlDsaParams) -> Dict[str, Any]:
@@ -66,10 +526,12 @@ def centered_mod_power_of_two(value: int, d: int) -> int:
     return r0
 
 
-def power2round_coeff(value: int, d: int) -> tuple[int, int]:
-    """Split coefficient into (high, low) with r = high*2^d + low."""
-    low = centered_mod_power_of_two(value, d)
-    high = (int(value) - low) // (1 << d)
+def power2round_coeff(value: int, d: int, q: int) -> tuple[int, int]:
+    """Split a mod-q coefficient into (high, low) with r = high*2^d + low."""
+    a = int(value) % q
+    two_d = 1 << d
+    low = centered_mod(a, two_d)
+    high = (a - low) >> d
     return high, low
 
 
@@ -82,11 +544,12 @@ def power2round_module(
     highs = []
     lows = []
     n = target_module.quotient_ring.degree
+    q = target_module.quotient_ring.coefficient_ring.modulus
     for entry in value.entries:
         hi = []
         lo = []
         for coeff in entry.to_coefficients(n):
-            c_hi, c_lo = power2round_coeff(coeff, d)
+            c_hi, c_lo = power2round_coeff(coeff, d, q)
             hi.append(c_hi)
             lo.append(c_lo)
         highs.append(target_module.quotient_ring.polynomial(hi))
@@ -106,9 +569,17 @@ def expand_a(
     if len(rho) != 32:
         raise ValueError("rho must be 32 bytes")
 
-    seed = hash_shake_bits(b"ml-dsa-expandA|" + bytes(rho), 256)
-    rng = sampling.make_deterministic_rng(seed)
-    return sampling.sample_uniform_matrix(quotient_ring, rows=k, cols=l, rng=rng)
+    q = quotient_ring.coefficient_ring.modulus
+    n = quotient_ring.degree
+    matrix: list[list[polynomials.QuotientPolynomial]] = []
+    for i in range(k):
+        row: list[polynomials.QuotientPolynomial] = []
+        for j in range(l):
+            seed = bytes(rho) + bytes([j, i])
+            coeffs = _rej_uniform_q(seed=seed, n=n, q=q)
+            row.append(quotient_ring.polynomial(coeffs))
+        matrix.append(row)
+    return matrix
 
 
 def expand_s(
@@ -120,17 +591,26 @@ def expand_s(
     """Deterministically expand s1 and s2 from rho'."""
     if not isinstance(rho_prime, (bytes, bytearray)):
         raise TypeError("rho_prime must be bytes-like")
-    if len(rho_prime) != 32:
-        raise ValueError("rho_prime must be 32 bytes")
+    if len(rho_prime) != 64:
+        raise ValueError("rho_prime must be 64 bytes")
 
-    s1_seed = hash_shake_bits(b"ml-dsa-expandS|s1|" + bytes(rho_prime), 256)
-    s2_seed = hash_shake_bits(b"ml-dsa-expandS|s2|" + bytes(rho_prime), 256)
-    rng_s1 = sampling.make_deterministic_rng(s1_seed)
-    rng_s2 = sampling.make_deterministic_rng(s2_seed)
+    n = module_l.quotient_ring.degree
+    nonce = 0
+    s1_entries = []
+    for _ in range(module_l.rank):
+        seed = bytes(rho_prime) + nonce.to_bytes(2, "little")
+        coeffs = _rej_eta(seed=seed, n=n, eta=eta)
+        s1_entries.append(module_l.quotient_ring.polynomial(coeffs))
+        nonce += 1
 
-    s1 = sampling.sample_small_vector(module_l, eta=eta, method="uniform", rng=rng_s1)
-    s2 = sampling.sample_small_vector(module_k, eta=eta, method="uniform", rng=rng_s2)
-    return s1, s2
+    s2_entries = []
+    for _ in range(module_k.rank):
+        seed = bytes(rho_prime) + nonce.to_bytes(2, "little")
+        coeffs = _rej_eta(seed=seed, n=n, eta=eta)
+        s2_entries.append(module_k.quotient_ring.polynomial(coeffs))
+        nonce += 1
+
+    return module_l.element(s1_entries), module_k.element(s2_entries)
 
 
 def expand_mask(
@@ -149,20 +629,58 @@ def expand_mask(
     if gamma1 <= 0:
         raise ValueError("gamma1 must be positive")
 
-    kappa_bytes = kappa.to_bytes(4, byteorder="big", signed=False)
-    seed = hash_shake_bits(
-        b"ml-dsa-expandMask|" + bytes(rho_2prime) + b"|" + kappa_bytes, 256
-    )
-    rng = sampling.make_deterministic_rng(seed)
-
-    lo = -gamma1 + 1
-    hi = gamma1
+    kappa_bytes = kappa.to_bytes(2, byteorder="little", signed=False)
     n = module_l.quotient_ring.degree
     entries = []
-    for _ in range(module_l.rank):
-        coeffs = [rng.randint(lo, hi) for _ in range(n)]
+    for r in range(module_l.rank):
+        nonce = int.from_bytes(kappa_bytes, "little") + r
+        seed = bytes(rho_2prime) + nonce.to_bytes(2, "little")
+        coeffs = _expand_mask_poly(seed=seed, n=n, gamma1=gamma1)
         entries.append(module_l.quotient_ring.polynomial(coeffs))
     return module_l.element(entries)
+
+
+def mat_vec_add_ahat(
+    matrix: list[list[polynomials.QuotientPolynomial]],
+    vector_entries: list[polynomials.QuotientPolynomial],
+    add_entries: list[polynomials.QuotientPolynomial],
+    q: int,
+    n: int,
+) -> list[polynomials.QuotientPolynomial]:
+    """Compute A_hat * vector + add_entries using ML-DSA NTT-domain arithmetic."""
+    if q != _ML_DSA_Q or n != _ML_DSA_N:
+        raise ValueError("mat_vec_add_ahat currently supports ML-DSA q=8380417, n=256")
+
+    rows = len(matrix)
+    if rows != len(add_entries):
+        raise ValueError("matrix row count must equal add_entries length")
+    if rows == 0:
+        return []
+
+    cols = len(vector_entries)
+    s_hat = [
+        _ml_dsa_ntt([centered_mod(c, q) for c in entry.to_coefficients(n)])
+        for entry in vector_entries
+    ]
+
+    ring = matrix[0][0].ring
+    out: list[polynomials.QuotientPolynomial] = []
+    for i, row in enumerate(matrix):
+        if len(row) != cols:
+            raise ValueError("matrix row width must equal vector length")
+
+        acc = [0] * n
+        for j in range(cols):
+            a_hat = row[j].to_coefficients(n)
+            prod = _poly_pointwise_montgomery(a_hat, s_hat[j])
+            acc = [acc[z] + prod[z] for z in range(n)]
+
+        coeffs = _ml_dsa_invntt_tomont(acc)
+        add_coeffs = [centered_mod(c, q) for c in add_entries[i].to_coefficients(n)]
+        coeffs = [(_caddq(coeffs[z] + add_coeffs[z])) % q for z in range(n)]
+        out.append(polynomials.QuotientPolynomial(coeffs, ring, n))
+
+    return out
 
 
 def sample_in_ball(
@@ -180,10 +698,18 @@ def sample_in_ball(
     if tau > n:
         raise ValueError("tau cannot exceed polynomial degree")
 
-    rng = random.Random(int.from_bytes(bytes(c_tilde), byteorder="big", signed=False))
+    read = _shake_reader(bytes(c_tilde), variant=256)
+    signs = int.from_bytes(read(8), byteorder="little", signed=False)
     coeffs = [0] * n
-    for index in rng.sample(range(n), tau):
-        coeffs[index] = 1 if rng.getrandbits(1) else -1
+
+    for i in range(n - tau, n):
+        while True:
+            b = read(1)[0]
+            if b <= i:
+                break
+        coeffs[i] = coeffs[b]
+        coeffs[b] = 1 if (signs & 1) == 0 else -1
+        signs >>= 1
     return ring.polynomial(coeffs)
 
 
@@ -235,11 +761,13 @@ def challenge_digest(
     mu: bytes,
     w1_payload: dict,
     lambda_bits: int,
+    gamma2: int,
 ) -> bytes:
     """Compute c_tilde = H(mu || w1, 2*lambda)."""
     if not isinstance(mu, (bytes, bytearray)):
         raise TypeError("mu must be bytes-like")
-    w1_bytes = serialization.to_bytes(w1_payload)
+    module_element = serialization.module_element_from_dict(w1_payload)
+    w1_bytes = pack_w1(module_element, gamma2=gamma2)
     return hash_shake_bits(bytes(mu) + w1_bytes, 2 * lambda_bits)
 
 
@@ -378,13 +906,13 @@ def low_bits_sufficiently_small(
     gamma2: int,
     beta: int,
 ) -> bool:
-    """Check `||LowBits(.)||_inf <= gamma2 - beta` over all coefficients."""
+    """Check `||LowBits(.)||_inf < gamma2 - beta` over all coefficients."""
     bound = max(gamma2 - beta, 0)
     q = value.module.quotient_ring.coefficient_ring.modulus
     n = value.module.quotient_ring.degree
     for entry in value.entries:
         for coeff in entry.to_coefficients(n):
-            if abs(centered_mod(coeff, q)) > bound:
+            if abs(centered_mod(coeff, q)) >= bound:
                 return False
     return True
 
@@ -413,6 +941,9 @@ __all__ = [
     "expand_mask",
     "sample_in_ball",
     "challenge_digest",
+    "pack_t1",
+    "pack_w1",
+    "mat_vec_add_ahat",
     "matrix_payload",
     "matrix_from_payload",
     "high_bits_module",

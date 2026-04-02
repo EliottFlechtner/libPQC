@@ -109,17 +109,19 @@ class TestMlDsaSignVerifyUtils(unittest.TestCase):
                 ]
             )
         )
-        out = challenge_digest(b"m" * 64, w_payload, lambda_bits=128)
+        out = challenge_digest(b"m" * 64, w_payload, lambda_bits=128, gamma2=95232)
         self.assertEqual(len(out), 32)
 
         with self.assertRaises(TypeError):
-            _ = challenge_digest("bad", w_payload, lambda_bits=128)  # type: ignore[arg-type]
+            _ = challenge_digest(
+                "bad", w_payload, lambda_bits=128, gamma2=95232
+            )  # type: ignore[arg-type]
 
         with self.assertRaises(ValueError):
             _ = decompose_coeff(1, self.q, alpha=0)
 
-        with self.assertRaises(ValueError):
-            _ = power2round_coeff(1, 0)
+        high, low = power2round_coeff(1, 0, self.q)
+        self.assertEqual((high, low), (1, 0))
 
     def test_use_hint_module_validation(self):
         r_value = self.mod_l2.element(

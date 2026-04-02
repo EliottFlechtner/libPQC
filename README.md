@@ -174,6 +174,29 @@ Run a single scheme test module while iterating:
 python3 -m unittest tests/schemes/ml_dsa/test_ml_dsa_sign.py
 ```
 
+## KAT Conformance
+
+The repository includes vector-based conformance suites for ML-KEM and ML-DSA:
+
+- `tests/conformance/test_ml_kem_kat.py`
+- `tests/conformance/test_ml_dsa_kat.py`
+
+Run both KAT suites in strict full-vector mode:
+
+```bash
+LIBPQC_KAT_MAX_RECORDS=1000 LIBPQC_KAT_REQUIRE_FULL=1 \
+python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py
+```
+
+Useful runtime controls:
+
+- `LIBPQC_KAT_MAX_RECORDS`: max records to process per vector file
+- `LIBPQC_KAT_REQUIRE_FULL`: enforce processing of every record in each file
+- `LIBPQC_KAT_PROGRESS`: print per-file progress counters
+
+For details on conformance helpers, adapter layers, and suggested folder architecture,
+see `tests/conformance/README.md`.
+
 ## Coverage
 
 Generate coverage data and reports:

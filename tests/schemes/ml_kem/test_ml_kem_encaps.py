@@ -5,6 +5,7 @@ from src.schemes.ml_kem.encaps import ml_kem_encaps
 from src.schemes.ml_kem.hashes import H, derive_k_r
 from src.schemes.ml_kem.keygen import ml_kem_keygen
 from src.schemes.ml_kem.kyber_pke import kyber_pke_decryption
+from src.schemes.ml_kem.pke_utils import encode_public_key_bytes
 
 
 class TestMlKemEncaps(unittest.TestCase):
@@ -28,7 +29,17 @@ class TestMlKemEncaps(unittest.TestCase):
         ct_obj = from_bytes(ciphertext)
         self.assertEqual(ct_obj["type"], "ml_kem_pke_ciphertext")
 
-        expected_k, _ = derive_k_r(m, H(ek))
+        ek_obj = from_bytes(ek)
+        expected_k, _ = derive_k_r(
+            m,
+            H(
+                encode_public_key_bytes(
+                    rho_hex=ek_obj["rho"],
+                    t_payload=ek_obj["t"],
+                    params="ML-KEM-768",
+                )
+            ),
+        )
         self.assertEqual(shared_key, expected_k)
 
         # Confirm ciphertext decrypts to m when using s from dk.
