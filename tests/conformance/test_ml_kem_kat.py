@@ -12,13 +12,13 @@ import re
 import unittest
 
 from src.schemes.ml_kem.ml_kem import ml_kem_decaps, ml_kem_encaps, ml_kem_keygen
-from tests.conformance.kat import require_rsp_vectors
-from tests.conformance.ml_kem import (
+from tests.conformance.common.kat import require_rsp_vectors
+from tests.conformance.ml_kem.loader import (
     load_ml_kem_rsp,
     ml_kem_records_by_section,
     require_hex_field,
 )
-from tests.conformance.ml_kem_rsp_adapter import (
+from tests.conformance.ml_kem.adapter import (
     ml_kem_ct_to_rsp_bytes,
     ml_kem_dk_to_rsp_bytes,
     ml_kem_ek_to_rsp_bytes,

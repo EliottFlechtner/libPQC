@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-CONFORMANCE_ROOT = Path(__file__).resolve().parent
+CONFORMANCE_ROOT = Path(__file__).resolve().parent.parent
 VECTOR_ROOT = CONFORMANCE_ROOT / "vectors"
 
 

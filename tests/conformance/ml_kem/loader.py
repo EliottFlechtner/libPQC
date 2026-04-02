@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .rsp import RspRecord, decode_hex_field, group_rsp_records, load_rsp_file
+from tests.conformance.common.rsp import (
+    RspRecord,
+    decode_hex_field,
+    group_rsp_records,
+    load_rsp_file,
+)
 
 
 def load_ml_kem_rsp(path: str | Path) -> list[RspRecord]:

@@ -13,13 +13,13 @@ import hashlib
 import unittest
 
 from src.schemes.ml_dsa.ml_dsa import ml_dsa_keygen, ml_dsa_sign, ml_dsa_verify
-from tests.conformance.kat import require_rsp_vectors
-from tests.conformance.ml_dsa import (
+from tests.conformance.common.kat import require_rsp_vectors
+from tests.conformance.ml_dsa.loader import (
     load_ml_dsa_rsp,
     ml_dsa_records_by_section,
     require_hex_field,
 )
-from tests.conformance.ml_dsa_rsp_adapter import (
+from tests.conformance.ml_dsa.adapter import (
     ml_dsa_sig_to_rsp_bytes,
     ml_dsa_sk_to_rsp_bytes,
     ml_dsa_vk_to_rsp_bytes,

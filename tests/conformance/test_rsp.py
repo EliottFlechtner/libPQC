@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.conformance.rsp import (
+from tests.conformance.common.rsp import (
     decode_hex_field,
     group_rsp_records,
     load_rsp_file,

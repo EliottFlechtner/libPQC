@@ -6,12 +6,24 @@ This folder hosts vector-based conformance checks against KAT .rsp files.
 
 - ML-KEM KAT checks: tests/conformance/test_ml_kem_kat.py
 - ML-DSA KAT checks: tests/conformance/test_ml_dsa_kat.py
-- Shared .rsp parser: tests/conformance/rsp.py
-- Vector discovery/loading: tests/conformance/kat.py
-- Scheme-specific loaders: tests/conformance/ml_kem.py, tests/conformance/ml_dsa.py
-- Byte-adapter bridges:
+- Shared parser/discovery (canonical):
+  - tests/conformance/common/rsp.py
+  - tests/conformance/common/kat.py
+- Scheme-specific loaders/adapters (canonical):
+  - tests/conformance/ml_kem/loader.py
+  - tests/conformance/ml_kem/adapter.py
+  - tests/conformance/ml_dsa/loader.py
+  - tests/conformance/ml_dsa/adapter.py
+- Backward-compatible wrappers remain in:
+  - tests/conformance/rsp.py
+  - tests/conformance/kat.py
+  - tests/conformance/ml_kem.py
+  - tests/conformance/ml_dsa.py
   - tests/conformance/ml_kem_rsp_adapter.py
   - tests/conformance/ml_dsa_rsp_adapter.py
+- Byte-adapter bridges:
+  - tests/conformance/ml_kem/adapter.py
+  - tests/conformance/ml_dsa/adapter.py
 
 ## Running
 
@@ -48,13 +60,8 @@ LIBPQC_KAT_PROGRESS=1 python3 -m unittest tests/conformance/test_ml_kem_kat.py
 
 ## Current Architecture
 
-The current design is a flat conformance package with explicit per-scheme files.
-This is simple and works well for two schemes.
-
-## Suggested Next Structure
-
-If more KAT suites are added, move to scheme-scoped subpackages while keeping
-shared parser/discovery utilities centralized.
+Conformance is now organized by shared/common helpers and per-scheme packages,
+with compatibility wrappers left in place to avoid import breakage.
 
 Suggested layout:
 
@@ -66,11 +73,11 @@ tests/conformance/
   ml_kem/
     loader.py
     adapter.py
-    test_kat.py
   ml_dsa/
     loader.py
     adapter.py
-    test_kat.py
+  test_ml_kem_kat.py
+  test_ml_dsa_kat.py
   vectors/
     ml_kem/
     ml_dsa/
