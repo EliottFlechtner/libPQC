@@ -23,12 +23,14 @@ def decode_required_hex_field(record: RspRecord, key: str) -> bytes:
     is not valid even-length hexadecimal.
     """
 
+    # Enforce presence first, then parse with whitespace-tolerant hex decoding.
     return decode_hex_field(record.require(key))
 
 
 def load_and_group_rsp_records(path: str | Path) -> dict[str | None, list[RspRecord]]:
     """Load an RSP file and group its records by section name."""
 
+    # Shared one-liner used by scheme vector loaders.
     return group_rsp_records(load_rsp_file(path))
 
 
@@ -42,6 +44,7 @@ def normalize_polynomial_coeffs(coeffs: list[int], expected_degree: int) -> list
     if len(coeffs) > expected_degree:
         raise ValueError("polynomial degree exceeds expected degree")
     if len(coeffs) < expected_degree:
+        # KAT payloads are fixed width; pad shorter internal rows to match.
         coeffs = coeffs + [0] * (expected_degree - len(coeffs))
     return coeffs
 
@@ -70,6 +73,7 @@ def require_module_element_entries(
     for coeffs in entries:
         if not isinstance(coeffs, list):
             raise ValueError(f"{payload_name} entry polynomial degree mismatch")
+        # Normalize each polynomial row to the expected ring degree.
         normalized = normalize_polynomial_coeffs(
             [int(c) for c in coeffs], expected_degree
         )

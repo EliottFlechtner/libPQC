@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 CONFORMANCE_ROOT = Path(__file__).resolve().parent.parent
+# Vectors are stored under tests/conformance/vectors/<scheme>/.
 VECTOR_ROOT = CONFORMANCE_ROOT / "vectors"
 
 
@@ -30,6 +31,7 @@ def list_rsp_vector_files(scheme_name: str) -> list[Path]:
     vector_dir = scheme_vector_dir(scheme_name)
     if not vector_dir.is_dir():
         return []
+    # Keep ordering deterministic so test output is stable across platforms.
     return sorted(vector_dir.glob("*.rsp"))
 
 

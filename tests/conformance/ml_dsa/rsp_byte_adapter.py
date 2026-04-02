@@ -103,6 +103,7 @@ def ml_dsa_vk_to_rsp_bytes(verification_key: bytes, params: str | dict) -> bytes
     k = resolved["k"]
     n = resolved["n"]
 
+    # Internal representation is a tagged JSON payload encoded as bytes.
     payload = serialization.from_bytes(verification_key)
     if payload.get("type") != "ml_dsa_verification_key":
         raise ValueError("invalid verification key payload type")
@@ -126,6 +127,7 @@ def ml_dsa_vk_to_rsp_bytes(verification_key: bytes, params: str | dict) -> bytes
     for coeffs in t1_entries:
         packed_t1.extend(_pack_t1_poly(coeffs))
 
+    # RSP verification-key layout: rho || packed(t1).
     return rho + bytes(packed_t1)
 
 
@@ -140,6 +142,7 @@ def ml_dsa_sk_to_rsp_bytes(signing_key: bytes, params: str | dict) -> bytes:
     eta = resolved["eta"]
     d = resolved["d"]
 
+    # Decode and validate the expected signing-key payload envelope.
     payload = serialization.from_bytes(signing_key)
     if payload.get("type") != "ml_dsa_signing_key":
         raise ValueError("invalid signing key payload type")
@@ -199,6 +202,7 @@ def ml_dsa_sk_to_rsp_bytes(signing_key: bytes, params: str | dict) -> bytes:
     for coeffs in t0_entries:
         packed_t0.extend(_pack_t0_poly(coeffs, d=d, q=q))
 
+    # RSP signing-key layout: rho || K || tr || s1 || s2 || t0.
     return rho + k_seed + tr + bytes(packed_s1) + bytes(packed_s2) + bytes(packed_t0)
 
 
@@ -214,6 +218,7 @@ def ml_dsa_sig_to_rsp_bytes(signature: bytes, params: str | dict) -> bytes:
     omega = resolved["omega"]
     lambda_bits = resolved["lambda"]
 
+    # Convert runtime signature envelope to packed c_tilde || z || h bytes.
     payload = serialization.from_bytes(signature)
     if payload.get("type") != "ml_dsa_signature":
         raise ValueError("invalid signature payload type")

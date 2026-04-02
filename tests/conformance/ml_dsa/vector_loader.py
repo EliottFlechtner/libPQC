@@ -17,12 +17,14 @@ from tests.conformance.common.utils import decode_required_hex_field
 def load_ml_dsa_vector_records(path: str | Path) -> list[RspRecord]:
     """Load an ML-DSA ``.rsp`` file into parsed records."""
 
+    # Thin wrapper keeps ML-DSA test imports self-descriptive.
     return load_rsp_file(path)
 
 
 def group_ml_dsa_vector_records(path: str | Path) -> dict[str | None, list[RspRecord]]:
     """Load an ML-DSA ``.rsp`` file and group records by section name."""
 
+    # Grouping is useful for future per-section filtering/debug tooling.
     return group_rsp_records(load_ml_dsa_vector_records(path))
 
 

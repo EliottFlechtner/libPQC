@@ -62,6 +62,7 @@ class TestMlKemKat(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         try:
+            # Discover all checked-in vector files for this scheme.
             cls.vector_files = require_rsp_vectors("ml_kem")
         except FileNotFoundError as exc:
             raise unittest.SkipTest(str(exc)) from exc
@@ -70,6 +71,7 @@ class TestMlKemKat(unittest.TestCase):
         self.assertTrue(self.vector_files)
 
     def test_vector_files_parse(self):
+        # Sanity-check parser behavior before running expensive byte checks.
         for vector_file in self.vector_files:
             records = load_ml_kem_vector_records(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
@@ -109,6 +111,7 @@ class TestMlKemKat(unittest.TestCase):
                 )
 
             for record in records:
+                # Cap work per file for fast local loops.
                 if processed >= max_records:
                     break
 

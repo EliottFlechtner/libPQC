@@ -25,6 +25,7 @@ def ml_kem_ek_to_rsp_bytes(encapsulation_key: bytes, params: str | dict) -> byte
     resolved = resolve_params(params)
     n = resolved["n"]
 
+    # Internal representation is a tagged JSON payload encoded as bytes.
     payload = serialization.from_bytes(encapsulation_key)
     if payload.get("type") != "ml_kem_encapsulation_key":
         raise ValueError("invalid encapsulation key payload type")
@@ -60,6 +61,7 @@ def ml_kem_dk_to_rsp_bytes(decapsulation_key: bytes, params: str | dict) -> byte
     k = resolved["k"]
     n = resolved["n"]
 
+    # Decode and validate the expected decapsulation-key payload envelope.
     payload = serialization.from_bytes(decapsulation_key)
     if payload.get("type") != "ml_kem_decapsulation_key":
         raise ValueError("invalid decapsulation key payload type")
@@ -90,6 +92,7 @@ def ml_kem_dk_to_rsp_bytes(decapsulation_key: bytes, params: str | dict) -> byte
 
     h_ek = bytes.fromhex(h_ek_hex)
     z = bytes.fromhex(z_hex)
+    # RSP secret-key layout: s || ek || H(ek) || z.
     return s_packed + ek_packed + h_ek + z
 
 
@@ -101,6 +104,7 @@ def ml_kem_ct_to_rsp_bytes(ciphertext: bytes, params: str | dict) -> bytes:
     du = resolved["du"]
     dv = resolved["dv"]
 
+    # Convert from runtime ciphertext envelope to packed c1||c2 vector bytes.
     payload = serialization.from_bytes(ciphertext)
     if payload.get("type") != "ml_kem_pke_ciphertext":
         raise ValueError("invalid ciphertext payload type")
