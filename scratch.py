@@ -48,12 +48,6 @@ def main() -> None:
 
             traceback.print_exc()
 
-        if i < len(demos):
-            try:
-                input("\nPress Enter to continue to next demo...")
-            except EOFError:
-                pass  # In non-interactive mode, continue automatically
-
     print("\n" + "=" * 80)
     print("✅ ALL DEMOS COMPLETED")
     print("=" * 80)
