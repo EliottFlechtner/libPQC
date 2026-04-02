@@ -50,9 +50,13 @@ def main() -> None:
         # According to NIST, operations taking > 2^100 or years >> 10 are impractical
         practical_threshold_years = 100  # Practical threshold for feasibility
         if years > practical_threshold_years:
-            print(f"  LLL Feasibility: ✅ NOT FEASIBLE ({years:.2e} years >> {practical_threshold_years} year threshold)")
+            print(
+                f"  LLL Feasibility: ✅ NOT FEASIBLE ({years:.2e} years >> {practical_threshold_years} year threshold)"
+            )
         else:
-            print(f"  LLL Feasibility: ⚠️  POTENTIALLY FEASIBLE ({years:.2e} years < {practical_threshold_years} year threshold)")
+            print(
+                f"  LLL Feasibility: ⚠️  POTENTIALLY FEASIBLE ({years:.2e} years < {practical_threshold_years} year threshold)"
+            )
             all_secure = False
             vulnerability_findings.append(
                 f"{param_set}: LLL attack feasible in {years:.2e} years (threshold: {practical_threshold_years} years)"
@@ -105,15 +109,21 @@ def main() -> None:
     bkz_200_768_bits = math.log2(bkz_200_768) if bkz_200_768 > 0 else 0
 
     if lll_768_time_years > 100:  # > 100 years = practical infeasibility
-        print(f"  ✅ Resists LLL reduction: YES (2^{lll_768_bits:.1f} bit ops, {lll_768_time_years:.0f} years)")
+        print(
+            f"  ✅ Resists LLL reduction: YES (2^{lll_768_bits:.1f} bit ops, {lll_768_time_years:.0f} years)"
+        )
     else:
-        print(f"  ⚠️  Resists LLL reduction: MARGINAL (2^{lll_768_bits:.1f} bit ops, {lll_768_time_years:.1f} years)")
+        print(
+            f"  ⚠️  Resists LLL reduction: MARGINAL (2^{lll_768_bits:.1f} bit ops, {lll_768_time_years:.1f} years)"
+        )
         all_secure = False
 
     if bkz_200_768_bits >= 192 * 0.9:  # Within 90% of target is acceptable
         print(f"  ✅ Resists BKZ-200: YES (2^{bkz_200_768_bits:.1f} bit operations)")
     else:
-        print(f"  ⚠️  Resists BKZ-200: MARGINAL (2^{bkz_200_768_bits:.1f}, need ~2^{192*0.9:.0f})")
+        print(
+            f"  ⚠️  Resists BKZ-200: MARGINAL (2^{bkz_200_768_bits:.1f}, need ~2^{192*0.9:.0f})"
+        )
         all_secure = False
 
     if lll_768_bits >= 96:  # Quantum threshold
@@ -133,15 +143,21 @@ def main() -> None:
     bkz_250_1024_bits = math.log2(bkz_250_1024) if bkz_250_1024 > 0 else 0
 
     if lll_1024_time_years > 500:  # > 500 years = very practical infeasibility
-        print(f"  ✅ Resists LLL reduction: YES (2^{lll_1024_bits:.1f} bit ops, {lll_1024_time_years:.0f} years)")
+        print(
+            f"  ✅ Resists LLL reduction: YES (2^{lll_1024_bits:.1f} bit ops, {lll_1024_time_years:.0f} years)"
+        )
     else:
-        print(f"  ⚠️  Resists LLL reduction: MARGINAL (2^{lll_1024_bits:.1f} bit ops, {lll_1024_time_years:.1f} years)")
+        print(
+            f"  ⚠️  Resists LLL reduction: MARGINAL (2^{lll_1024_bits:.1f} bit ops, {lll_1024_time_years:.1f} years)"
+        )
         all_secure = False
 
     if bkz_250_1024_bits >= 256 * 0.9:  # Within 90% of target is acceptable
         print(f"  ✅ Resists BKZ-250: YES (2^{bkz_250_1024_bits:.1f} bit operations)")
     else:
-        print(f"  ⚠️  Resists BKZ-250: MARGINAL (2^{bkz_250_1024_bits:.1f}, need ~2^{256*0.9:.0f})")
+        print(
+            f"  ⚠️  Resists BKZ-250: MARGINAL (2^{bkz_250_1024_bits:.1f}, need ~2^{256*0.9:.0f})"
+        )
         all_secure = False
 
     if lll_1024_bits >= 128:  # Quantum threshold
