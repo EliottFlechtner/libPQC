@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import hashlib
+import time
 import unittest
 
 from src.schemes.ml_dsa.ml_dsa import ml_dsa_keygen, ml_dsa_sign, ml_dsa_verify
@@ -57,6 +58,21 @@ def _require_full_processing() -> bool:
 def _show_progress() -> bool:
     raw = os.getenv("LIBPQC_KAT_PROGRESS", "0").strip().lower()
     return raw in {"1", "true", "yes", "on"}
+
+
+def _show_timing() -> bool:
+    raw = os.getenv("LIBPQC_KAT_TIMING", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _vector_file_filter() -> re.Pattern[str] | None:
+    raw = os.getenv("LIBPQC_KAT_VECTOR_FILTER", "").strip()
+    if not raw:
+        return None
+    try:
+        return re.compile(raw, re.IGNORECASE)
+    except re.error as exc:
+        raise ValueError("LIBPQC_KAT_VECTOR_FILTER must be a valid regex") from exc
 
 
 def _require_adapter_match() -> bool:
@@ -139,8 +155,12 @@ class TestMlDsaKat(unittest.TestCase):
         max_records = _max_records()
         require_full = _require_full_processing()
         require_adapter_match = _require_adapter_match()
+        vector_filter = _vector_file_filter()
 
         for vector_file in self.vector_files:
+            if vector_filter and not vector_filter.search(vector_file.name):
+                continue
+
             records = load_ml_dsa_vector_records(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
             total_records = len(records)
@@ -162,6 +182,8 @@ class TestMlDsaKat(unittest.TestCase):
             strict_matches = 0
             adapter_mismatches = 0
             show_progress = _show_progress()
+            show_timing = _show_timing()
+            file_start = time.perf_counter()
 
             if show_progress:
                 print(
@@ -267,13 +289,14 @@ class TestMlDsaKat(unittest.TestCase):
                     ),
                 )
 
-            if show_progress:
+            if show_progress or show_timing:
+                elapsed_s = time.perf_counter() - file_start
                 print(
                     f"[ML-DSA] {vector_file.name}: done "
                     f"(processed={processed}, tested={tested}, "
                     f"strict_matches={strict_matches}, "
                     f"adapter_mismatches={adapter_mismatches}, "
-                    f"total={total_records})",
+                    f"total={total_records}, elapsed_s={elapsed_s:.3f})",
                     flush=True,
                 )
             self.assertGreater(
