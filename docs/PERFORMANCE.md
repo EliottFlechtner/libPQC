@@ -18,48 +18,31 @@
 
 ## Baseline Metrics
 
-### Key Operations (Target Platform: x86-64 @ 1-3 GHz)
+### Status: No Profiling Data Collected
 
-#### ML-KEM Operations
+**Note**: Benchmarking has not yet been performed on this implementation. The following sections document the framework for profiling, with example metrics from reference implementations for comparison.
 
-| Operation | Time (ms) | Notes |
-|---|---|---|
-| KeyGen | TBD | Includes matrix sampling, error generation, NTT |
-| Encaps | TBD | Matrix-vector multiply, compression |
-| Decaps | TBD | Inverse operations, decompression |
+### Expected Performance (Based on Reference Implementations)
 
-#### ML-DSA Operations
+For reference, Kyber and Dilithium reference implementations typically achieve:
 
-| Operation | Time (ms) | Notes |
-|---|---|---|
-| KeyGen | TBD | Similar to ML-KEM + PowerRound |
-| Sign | TBD | Dominated by rejection sampling (1-2 iterations typical) |
-| Verify | TBD | Single matrix multiply |
+#### ML-KEM Operations (estimated)
 
-### Cycle Counts by Component
+| Operation | Cycles | Platform | Notes |
+|---|---|---|---|
+| KeyGen | ~40,000 | x86-64 | Based on Kyber reference; libPQC uses NTT (likely similar) |
+| Encaps | ~25,000 | x86-64 | Dominated by NTT + sampling |
+| Decaps | ~30,000 | x86-64 | Inverse operations + decompression |
 
-#### NTT (256 coefficients)
+#### ML-DSA Operations (estimated)
 
-```
-Forward NTT:  ~5,000 - 10,000 cycles
-Inverse NTT:  ~5,000 - 10,000 cycles
-Point multiply: ~100 - 200 cycles per point
-```
+| Operation | Cycles | Platform | Notes |
+|---|---|---|---|
+| KeyGen | ~60,000 | x86-64 | Based on Dilithium reference |
+| Sign | ~50,000 | x86-64 | Includes rejection sampling (~1-2 iterations) |
+| Verify | ~30,000 | x86-64 | Single matrix multiply + hash |
 
-#### Polynomial Multiplication
-
-```
-Coefficient domain: ~65,536 multiplies (256²) → impractical
-NTT-based: 256 point mults + 2×NTT → ~20,000 - 30,000 cycles
-Karatsuba variant: TBD (if implemented)
-```
-
-#### Sampling
-
-```
-CBD_η1: ~1,000 - 2,000 cycles (SHAKE256 + arithmetic)
-SampleA: ~50,000+ cycles per matrix row (deterministic expansion)
-```
+**Important**: libPQC is a pure Python implementation with optional C extensions. Absolute cycle counts will be 10-100× slower than C implementations. Relative performance should be similar if NTT and sampling are optimized.
 
 ---
 
@@ -155,41 +138,25 @@ SampleA: ~50,000+ cycles per matrix row (deterministic expansion)
 
 ## Comparison with Reference Implementations
 
-### Benchmarks (Cycles, rounded)
+### Performance Comparison Methodology
 
-**Reference**: libpqc vs Kyber official vs liboqs
+When benchmarking libPQC, compare against:
+- **Kyber reference implementation** (C, pure)
+- **liboqs** (C, optimized)
+- **libpqc** (C, optimized by PQCryptography)
 
-| Operation | libPQC | Kyber Ref | liboqs | Notes |
-|---|---|---|---|---|
-| ML-KEM-768 KeyGen | TBD | ~40K | ~35K | Includes all setup |
-| ML-KEM-768 Encaps | TBD | ~25K | ~24K | Per encapsulation |
-| ML-KEM-768 Decaps | TBD | ~30K | ~28K | Per decapsulation |
-| ML-DSA-65 KeyGen | TBD | ~60K | ~55K |  |
-| ML-DSA-65 Sign | TBD | ~50K | ~45K | Includes rejection |
-| ML-DSA-65 Verify | TBD | ~30K | ~28K | Rejection-free |
-
-### Interpretation
-
-- **Within ±20% of reference**: Acceptable (close to optimal)
-- **20-50% slower**: Acceptable (minor optimizations available)
-- **>50% slower**: Investigate (likely algorithmic issue)
+**Expected pattern**:
+- libPQC (Python) ≈ 10-100× slower than C implementations
+- Overhead comes from bytecode interpretation, not algorithmic differences
+- Relative time distribution should be similar (same algorithmic complexity)
 
 ---
 
 ## Bottleneck Analysis
 
-### Profiling Methodology
+### About This Section
 
-```bash
-# Run with CPU performance counter
-perf stat -e cycles,instructions,L1-dcache-load-misses \
-  python -m tests.integration.test_ml_kem
-
-# For detailed flame graphs
-py-spy record --rate 100 -d 5 -- python test_ml_kem.py
-```
-
-### Expected Bottlenecks (by operation)
+The following describes expected bottlenecks **based on algorithm analysis**, not measured data. Until `py-spy` or `cProfile` runs are available, these are educated guesses. See [Profiling Methodology](#bottleneck-analysis) for how to gather real data.
 
 #### KeyGen
 1. **NTT**: ~40% (forward transforms)
@@ -217,38 +184,71 @@ py-spy record --rate 100 -d 5 -- python test_ml_kem.py
 
 ---
 
-## Recommendations for Optimization
+## Recommendations for Profiling & Optimization
 
-### Phase 1 (Immediate, 15-20% speedup)
-- [ ] Profile current implementation to identify actual bottlenecks
-- [ ] Implement NTT weight precomputation
-- [ ] Unroll NTT butterfly loops
+### Phase 1: Baseline Profiling (Before optimization)
 
-### Phase 2 (Medium-term, 50-100% speedup)
-- [ ] SIMD vectorization (AVX2)
-- [ ] Optimize hash expansion (if separate bottleneck)
+To establish what the actual bottlenecks are:
+
+```bash
+# Python profiling with cProfile
+python -m cProfile -s cumtime -o libpqc_profile.txt scratch.py
+
+# Visualize with snakeviz
+pip install snakeviz
+snakeviz libpqc_profile.txt
+```
+
+**Goals for Phase 1**:
+- [ ] Measure actual time for each demo operation (KeyGen, Encaps, Sign, Verify)
+- [ ] Identify which operations consume most time (NTT? Sampling? Arithmetic?)
+- [ ] Measure wall-clock time for all 6 demos in `scratch.py`
+- [ ] Compare relative time spending (e.g., NTT vs sampling ratio)
+
+### Phase 2: Optimization (If needed for portfolio)
+
+Low-hanging fruit if profiling reveals them:
+- [ ] Profile current NTT implementation to identify innermost loops
+- [ ] Implement NTT weight precomputation (if not already done)
+- [ ] Unroll NTT butterfly operations (minor speedup from loop overhead)
+- [ ] Profile polynomial multiplication (check if NTT is actually fastest choice)
+
+### Phase 3: Research Optimizations (Beyond MVP)
+
+Higher-complexity optimizations (likely beyond PhD scope):
+- [ ] SIMD vectorization (AVX2 for batch operations)
 - [ ] Batch verification infrastructure
+- [ ] Karatsuba variant (if coefficient domain ever used)
 
-### Phase 3 (Long-term, 3-10× speedup)
-- [ ] Consider specialized instruction sets (AVX-512, ARM NEON)
-- [ ] GPU variants for bulk operations
-- [ ] Hardware acceleration (ASIC/FPGA) for production
+---
+
+**Note**: Profiling is most valuable AFTER implementing correct algorithms. The current focus is on demonstrating security analysis and correct implementations; performance optimization comes later.
 
 ---
 
 ## Target Performance Goals
 
-**Research Implementation**:
-- ML-KEM-768 KeyGen: <200ms
-- ML-KEM-768 Encaps: <50ms
-- ML-DSA-65 Sign: <100ms
-- ML-DSA-65 Verify: <50ms
+### Research Implementation (libPQC - Python)
 
-**Production Implementation**:
-- ML-KEM-768 KeyGen: <50ms
-- ML-KEM-768 Encaps: <10ms
-- ML-DSA-65 Sign: <20ms
-- ML-DSA-65 Verify: <10ms
+**Current Focus**: Correctness & clarity, not performance optimization.
+
+**Acceptable ranges** (for research portfolio):
+- ML-KEM-768 KeyGen: < 5 seconds
+- ML-KEM-768 Encaps: < 1 second
+- ML-DSA-65 Sign: < 2 seconds
+- ML-DSA-65 Verify: < 1 second
+
+**Rationale**: Python overhead dominates; algorithmic efficiency is verified through NTT implementation & no unnecessary loops. Production C implementations will be 10-100× faster with same algorithms.
+
+### Production Implementation (C/Rust target)
+
+**Target performance** (if optimized to C):
+- ML-KEM-768 KeyGen: < 50ms
+- ML-KEM-768 Encaps: < 10ms
+- ML-DSA-65 Sign: < 20ms
+- ML-DSA-65 Verify: < 10ms
+
+**Note**: These are based on libOQS reference implementations; libPQC does not currently target production-level performance.
 
 ---
 
