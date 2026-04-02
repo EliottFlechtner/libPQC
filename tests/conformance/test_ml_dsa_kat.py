@@ -37,6 +37,8 @@ def _params_from_filename(name: str) -> str:
 
 
 def _max_records() -> int:
+    # Default to a small cap for fast local iteration. CI/full checks can raise
+    # this via environment variable.
     raw = os.getenv("LIBPQC_KAT_MAX_RECORDS", "5")
     try:
         value = int(raw)
@@ -196,6 +198,8 @@ class TestMlDsaKat(unittest.TestCase):
                         message=msg,
                         context=context,
                     )
+                    # Hedged vectors supply per-record randomness; deterministic
+                    # vectors use a fixed all-zero seed.
                     signing_rnd = (
                         require_hex_field(record, "rng")
                         if _is_hedged_vector(vector_file.name)
@@ -236,6 +240,8 @@ class TestMlDsaKat(unittest.TestCase):
                         adapter_mismatches += 1
                         self.assertEqual(actual_sig, expected_sig)
                     self.assertTrue(
+                        # Verify against the original internal representation to
+                        # ensure signing/verification logic is self-consistent.
                         ml_dsa_verify(
                             signing_message,
                             signature,
@@ -247,6 +253,7 @@ class TestMlDsaKat(unittest.TestCase):
                     tested += 1
 
             if require_full:
+                # Enforce strict mode expectation: every record in file checked.
                 self.assertEqual(
                     processed,
                     total_records,

@@ -46,6 +46,8 @@ def decode_hex_field(value: str) -> bytes:
 
 
 def _iter_rsp_blocks(text: str) -> Iterable[tuple[str | None, list[tuple[str, str]]]]:
+    # Keep section context while iterating; records may appear under headers
+    # like [ML-KEM-768], but many files also omit sections.
     section: str | None = None
     current: list[tuple[str, str]] = []
     current_keys: set[str] = set()
@@ -64,6 +66,7 @@ def _iter_rsp_blocks(text: str) -> Iterable[tuple[str | None, list[tuple[str, st
                 yield section, current
                 current = []
                 current_keys = set()
+            # Section boundaries also imply a new logical record stream.
             section = line[1:-1].strip() or None
             continue
 
@@ -93,6 +96,8 @@ def parse_rsp_text(text: str) -> list[RspRecord]:
 
     records: list[RspRecord] = []
     for index, (section, pairs) in enumerate(_iter_rsp_blocks(text)):
+        # Keep last-write-wins semantics for duplicate keys within a record,
+        # which mirrors common parser behavior for simple KAT payloads.
         fields: dict[str, str] = {}
         for key, value in pairs:
             fields[key] = value

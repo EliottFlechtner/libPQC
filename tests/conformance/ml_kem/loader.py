@@ -1,4 +1,8 @@
-"""ML-KEM KAT helpers."""
+"""ML-KEM KAT helpers.
+
+This module intentionally stays thin: it wraps shared parser utilities with
+ML-KEM-specific names so test files read naturally.
+"""
 
 from __future__ import annotations
 
@@ -13,18 +17,22 @@ from tests.conformance.common.rsp import (
 
 
 def load_ml_kem_rsp(path: str | Path) -> list[RspRecord]:
-    """Load an ML-KEM `.rsp` file."""
+    """Load an ML-KEM ``.rsp`` file into typed records."""
 
     return load_rsp_file(path)
 
 
 def ml_kem_records_by_section(path: str | Path) -> dict[str | None, list[RspRecord]]:
-    """Load an ML-KEM `.rsp` file and group records by section."""
+    """Load an ML-KEM ``.rsp`` file and group records by section."""
 
     return group_rsp_records(load_ml_kem_rsp(path))
 
 
 def require_hex_field(record: RspRecord, key: str) -> bytes:
-    """Decode a required hex field from a record."""
+    """Decode a required hex field from a record.
+
+    Raises ``KeyError`` if the field is missing and ``ValueError`` if the
+    field cannot be parsed as even-length hexadecimal.
+    """
 
     return decode_hex_field(record.require(key))

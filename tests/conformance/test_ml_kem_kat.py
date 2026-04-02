@@ -36,6 +36,8 @@ def _params_from_filename(name: str) -> str:
 
 
 def _max_records() -> int:
+    # Default to a small cap for fast local iteration. CI/full checks can raise
+    # this via environment variable.
     raw = os.getenv("LIBPQC_KAT_MAX_RECORDS", "5")
     try:
         value = int(raw)
@@ -126,8 +128,10 @@ class TestMlKemKat(unittest.TestCase):
                     expected_ct = require_hex_field(record, "ct")
                     expected_ss = require_hex_field(record, "ss")
 
+                    # Reconstruct deterministic keypair from vector seeds.
                     ek, dk = ml_kem_keygen(params=params, aseed=d, zseed=z)
 
+                    # Adapt internal payloads to FIPS/NIST packed byte format.
                     actual_pk = ml_kem_ek_to_rsp_bytes(ek, params=params)
                     actual_sk = ml_kem_dk_to_rsp_bytes(dk, params=params)
 
@@ -153,6 +157,7 @@ class TestMlKemKat(unittest.TestCase):
                 )
 
             if require_full:
+                # Enforce strict mode expectation: every record in file checked.
                 self.assertEqual(
                     processed,
                     total_records,
