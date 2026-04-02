@@ -55,6 +55,25 @@ Progress output:
 LIBPQC_KAT_PROGRESS=1 python3 -m unittest tests/conformance/test_ml_kem_kat.py
 ```
 
+Per-file timing output:
+
+```bash
+LIBPQC_KAT_PROGRESS=1 LIBPQC_KAT_TIMING=1 \
+python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py
+```
+
+Conformance summary script (pass/fail + processed counts by vector file):
+
+```bash
+python3 scripts/conformance_summary.py --max-records 2
+```
+
+Full-vector summary mode:
+
+```bash
+python3 scripts/conformance_summary.py --max-records 1000 --full
+```
+
 ## Environment Knobs
 
 - LIBPQC_KAT_MAX_RECORDS
@@ -64,6 +83,10 @@ LIBPQC_KAT_PROGRESS=1 python3 -m unittest tests/conformance/test_ml_kem_kat.py
   - If enabled, test fails unless all records in each file were processed.
 - LIBPQC_KAT_PROGRESS
   - If enabled, prints running counters per vector file.
+- LIBPQC_KAT_TIMING
+  - If enabled, prints per-file elapsed seconds in completion output.
+- LIBPQC_KAT_VECTOR_FILTER
+  - Optional regex used to include only matching vector file names.
 - LIBPQC_KAT_REQUIRE_ADAPTER_MATCH (ML-DSA)
   - Controls strict adapter mismatch behavior in the ML-DSA suite.
 
@@ -85,6 +108,14 @@ Validated on 2026-04-02 with repository vectors currently checked in:
 
 This confirms the checked-in ML-KEM and ML-DSA KAT vector suites pass in both
 smoke mode and full-record mode.
+
+## CI Behavior
+
+- Pull requests and non-scheduled CI runs execute conformance in reduced
+  smoke mode (`LIBPQC_KAT_MAX_RECORDS=2`).
+- Nightly scheduled CI runs execute strict full-vector conformance
+  (`LIBPQC_KAT_MAX_RECORDS=1000` + `LIBPQC_KAT_REQUIRE_FULL=1`).
+- Both modes enable progress and timing output for observability.
 
 ## Current Architecture
 
@@ -116,8 +147,6 @@ adapter and test behavior.
 
 ## Practical Next Improvements
 
-1. Add a small conformance summary script that prints pass/fail and processed
-   record counts for each vector file.
-2. Add CI job step for full conformance mode on a schedule (nightly), while
-   keeping PR CI on reduced max-record smoke mode.
-3. Add per-file timing output for performance tracking during KAT runs.
+1. Persist summary-script output as a CI artifact for easier historical review.
+2. Add thresholds/alerts for conformance timing regressions over time.
+3. Add optional JSON output mode for `scripts/conformance_summary.py`.
