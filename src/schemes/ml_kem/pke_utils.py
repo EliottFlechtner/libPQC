@@ -45,9 +45,14 @@ def encode_polyvec_12(entries: list[list[int]], degree: int) -> bytes:
     """Encode a vector of degree-`degree` polynomials with 12-bit coefficients."""
     packed = bytearray()
     for coeffs in entries:
-        if len(coeffs) != degree:
+        if len(coeffs) > degree:
             raise ValueError("polynomial degree mismatch in polyvec encoding")
-        packed.extend(pack_bits_le([int(c) for c in coeffs], 12))
+        # Serialized quotient polynomials may omit trailing zeros. Normalize to
+        # the fixed Kyber degree before bit-packing.
+        normalized = [int(c) for c in coeffs]
+        if len(normalized) < degree:
+            normalized.extend([0] * (degree - len(normalized)))
+        packed.extend(pack_bits_le(normalized, 12))
     return bytes(packed)
 
 
