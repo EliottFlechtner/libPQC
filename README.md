@@ -63,47 +63,52 @@ This first release ships a working, tested, educational implementation of:
 ```text
 src/
   core/
-    integers.py
-    polynomials.py
-    module.py
-    ntt.py
-    sampling.py
-    serialization.py
+    integers.py           # integer ring arithmetic
+    polynomials.py        # polynomial ring operations
+    module.py             # module arithmetic
+    ntt.py                # number-theoretic transform
+    sampling.py           # sampling utilities (CBD, uniform)
+    serialization.py      # byte serialization helpers
 
   schemes/
+    utils.py              # shared utilities (CRH, XOF, PRF)
     ml_kem/
-      kyber_pke.py      # active PKE implementation
-      pke_utils.py
-      vectors.py
-      params.py
-      keygen.py         # KEM keygen (ek, dk packaging)
-      encaps.py         # KEM encapsulation
-      decaps.py         # KEM decapsulation
-      ml_kem.py         # canonical high-level exports
-      hashes.py         # G/H/J and K/R derivation
+      kyber_pke.py        # PKE foundation layer
+      pke_utils.py        # PKE helper functions
+      vectors.py          # matrix/vector definitions
+      params.py           # ML-KEM parameter presets
+      kyber_ntt.py        # NTT-based operations for ML-KEM
+      kyber_sampling.py   # ML-KEM-specific sampling
+      keygen.py           # KEM key generation
+      encaps.py           # KEM encapsulation
+      decaps.py           # KEM decapsulation
+      hashes.py           # G/H/J hash and derivation functions
+      ml_kem.py           # canonical high-level exports
 
     ml_dsa/
-      keygen.py
-      sign.py
-      verify.py
-      sign_verify_utils.py
-      params.py
-      ml_dsa.py         # canonical high-level exports
+      params.py           # ML-DSA parameter presets
+      keygen.py           # key generation
+      sign.py             # signing logic
+      verify.py           # verification logic
+      sign_verify_utils.py # signing/verification utilities
+      ml_dsa.py           # canonical high-level exports
 
-  comms/                # scaffolding
-  experiments/          # scaffolding
-  app/                  # scaffolding
+  comms/                  # scaffolding
+  experiments/            # scaffolding
+  app/                    # scaffolding
 
 tests/
   core/
-    test_*.py
+    test_*.py             # core algebra tests
   schemes/
     ml_kem/
-      test_*.py
+      test_*.py           # ML-KEM tests
     ml_dsa/
-      test_*.py
+      test_*.py           # ML-DSA tests
   integration/
-    test_*.py
+    test_*.py             # end-to-end tests
+  conformance/
+    test_*.py             # KAT conformance suites
 ```
 
 ## Quick Start
