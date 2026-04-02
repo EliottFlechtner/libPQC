@@ -197,6 +197,29 @@ Useful runtime controls:
 For details on conformance helpers, adapter layers, and suggested folder architecture,
 see `tests/conformance/README.md`.
 
+### Current KAT Status (Verified)
+
+As of 2026-04-02, both conformance suites pass against the currently checked-in
+vector corpus (`tests/conformance/vectors/ml_kem/*.rsp` and
+`tests/conformance/vectors/ml_dsa/*.rsp`).
+
+Verified runs:
+
+- default mode
+  - `python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py`
+  - result: `Ran 6 tests ... OK`
+- strict full-vector mode
+  - `LIBPQC_KAT_MAX_RECORDS=1000 LIBPQC_KAT_REQUIRE_FULL=1 python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py`
+  - result: `Ran 6 tests ... OK`
+
+What this currently guarantees:
+
+- ML-KEM vector comparisons pass for packed public key, packed secret key,
+  ciphertext bytes, and shared secret checks.
+- ML-DSA vector comparisons pass for packed verification/signing keys,
+  signature bytes, and verification acceptance for the vector-specific message
+  domain handling (`raw`, `pure`, `hashed`, and hedged/deterministic modes).
+
 ## Coverage
 
 Generate coverage data and reports:
@@ -249,7 +272,6 @@ Implemented in this release:
 
 Next priorities:
 
-- vector-based conformance checks against official KATs
 - performance profiling and optional optimized paths
 - richer protocol-level examples (key exchange + signed channel skeleton)
 - API stabilization and packaging improvements

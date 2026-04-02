@@ -1,5 +1,9 @@
 # Conformance Test Guide
 
+[![KAT Smoke](https://img.shields.io/badge/KAT%20smoke-pass-brightgreen)](#verified-status)
+[![KAT Full](https://img.shields.io/badge/KAT%20full--vector-pass-brightgreen)](#verified-status)
+[![Last Verified](https://img.shields.io/badge/verified-2026--04--02-blue)](#verified-status)
+
 This folder hosts vector-based conformance checks against KAT .rsp files.
 
 ## Scope
@@ -24,6 +28,17 @@ This folder hosts vector-based conformance checks against KAT .rsp files.
 - Byte-adapter bridges:
   - tests/conformance/ml_kem/adapter.py
   - tests/conformance/ml_dsa/adapter.py
+
+## What These Tests Assert
+
+- RSP parsing is stable for comment lines, section headers, blank-line record
+  separators, and repeated-key record boundaries.
+- ML-KEM vectors validate deterministic key generation, encapsulation
+  ciphertext bytes, and shared-secret agreement on encaps/decaps.
+- ML-DSA vectors validate deterministic key generation, signature bytes, and
+  successful verification for the vector-defined external message format.
+- Adapter modules explicitly map internal JSON payload encodings into compact
+  packed KAT byte layouts before byte-for-byte comparisons.
 
 ## Running
 
@@ -57,6 +72,25 @@ LIBPQC_KAT_PROGRESS=1 python3 -m unittest tests/conformance/test_ml_kem_kat.py
   - If enabled, prints running counters per vector file.
 - LIBPQC_KAT_REQUIRE_ADAPTER_MATCH (ML-DSA)
   - Controls strict adapter mismatch behavior in the ML-DSA suite.
+
+## Verified Status
+
+Validated on 2026-04-02 with repository vectors currently checked in:
+
+| Suite | Mode | Vector files | Result |
+|---|---|---:|---|
+| ML-KEM + ML-DSA conformance | smoke/default | 21 (3 ML-KEM, 18 ML-DSA) | pass |
+| ML-KEM + ML-DSA conformance | strict full-vector | 21 (3 ML-KEM, 18 ML-DSA) | pass |
+
+- default conformance mode:
+  - `python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py`
+  - result: `Ran 6 tests ... OK`
+- strict full-vector mode:
+  - `LIBPQC_KAT_MAX_RECORDS=1000 LIBPQC_KAT_REQUIRE_FULL=1 python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py`
+  - result: `Ran 6 tests ... OK`
+
+This confirms the checked-in ML-KEM and ML-DSA KAT vector suites pass in both
+smoke mode and full-record mode.
 
 ## Current Architecture
 
