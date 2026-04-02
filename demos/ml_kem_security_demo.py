@@ -1,10 +1,11 @@
 """
-ML-KEM attack surface analysis demo (FIXED - REAL COMPUTATIONS).
+ML-KEM attack surface analysis demo (FIXED - COMPUTED SECURITY VERDICTS).
 
-Demonstrates ML-KEM-specific attack analysis:
-- Decryption failure probability analysis
-- CCA2 security properties
-- Attack cost calculations
+Demonstrates ML-KEM-specific attack analysis with verified security:
+- Decryption failure probability analysis with threshold checks
+- CCA2 security properties verification
+- Attack cost calculations against security targets
+- Security verdicts based on computed values, not hardcoded
 """
 
 import math
@@ -21,8 +22,15 @@ def main() -> None:
     print("ML-KEM ATTACK SURFACE ANALYSIS")
     print("=" * 70)
 
+    # Security thresholds (bits) for each parameter set
+    security_targets = {512: 128, 768: 192, 1024: 256}
+
+    # Track security verdicts based on computed values
+    all_secure = True
+    vulnerability_findings = []
+
     # ========== Decryption Failure Analysis ==========
-    print("\n[1] Decryption Failure Probability (COMPUTED)")
+    print("\n[1] Decryption Failure Probability (COMPUTED + VERIFIED)")
     print("-" * 70)
 
     df_analyzer = DecryptionFailureAnalyzer()
@@ -39,9 +47,20 @@ def main() -> None:
         df_prob = df_analyzer.probability_per_decryption(param_set)
         df_bits = -math.log2(df_prob) if df_prob > 0 else 200
 
+        # VERIFICATION: DF attack cost must exceed security target
+        target = security_targets[param_set]
+        if df_bits >= target:
+            safety_verdict = "✅ SAFE"
+        else:
+            safety_verdict = "⚠️  WEAK"
+            all_secure = False
+            vulnerability_findings.append(
+                f"ML-KEM-{param_set}: DF cost ({df_bits:.0f} bits) < security target ({target} bits)"
+            )
+
         print(
             f"ML-KEM-{param_set:4d} | {pk_bytes:4d}B    | {sk_bytes:4d}B    | "
-            f"< 2^-{df_bits:.0f}    | ✅ SAFE"
+            f"< 2^-{df_bits:.0f}    | {safety_verdict}"
         )
 
     # ========== ML-KEM Complete Attack Analysis ==========
@@ -74,7 +93,7 @@ def main() -> None:
     print(f"\nLattice (BKZ-200)      | {str(lattice_cost)[:60]}")
 
     # ========== Decryption Failure Attack Deep Dive ==========
-    print("\n[4] Decryption Failure Attack: Feasibility Analysis (COMPUTED)")
+    print("\n[4] Decryption Failure Attack: Feasibility Analysis (COMPUTED + VERIFIED)")
     print("-" * 70)
 
     print("\nAttack Goal: Trigger DF to recover secret key via sampling")
@@ -85,19 +104,29 @@ def main() -> None:
         samples_needed = df_analyzer.statistical_samples_needed(df_prob, 0.99)
         # Approx cost: need to encrypt that many times
         cost_bits = math.log2(max(samples_needed, 1))
+        target = security_targets[param_set]
 
-        verdict = "❌ INFEASIBLE" if cost_bits > 128 else "✅ POTENTIALLY FEASIBLE"
+        # VERIFICATION: Cost must exceed security target
+        if cost_bits >= target:
+            verdict = "❌ INFEASIBLE"
+        else:
+            verdict = "⚠️  POTENTIALLY FEASIBLE"
+            all_secure = False
+            vulnerability_findings.append(
+                f"ML-KEM-{param_set}: DF attack cost ({cost_bits:.1f} bits) < security target ({target} bits)"
+            )
 
         print(
             f"\n  ML-KEM-{param_set}:"
             f"\n    - DF probability: {df_prob:.2e}"
             f"\n    - Samples for detection (99% conf): {samples_needed:.2e}"
             f"\n    - Cost to mount: ~2^{cost_bits:.1f} encrypt ops"
+            f"\n    - Target security: ~2^{target} ops"
             f"\n    - Verdict: {verdict}"
         )
 
     # ========== Attack feasibility for each parameter ==========
-    print("\n[5] Chosen-Ciphertext Attack Feasibility (COMPUTED)")
+    print("\n[5] Chosen-Ciphertext Attack Feasibility (COMPUTED + VERIFIED)")
     print("-" * 70)
 
     for param_set in [512, 768, 1024]:
@@ -105,8 +134,45 @@ def main() -> None:
         print(f"\nML-KEM-{param_set}:")
         print(f"  {feasibility}")
 
+        # VERIFICATION: is_feasible must be False for security
+        if feasibility.get("is_feasible", False):
+            all_secure = False
+            vulnerability_findings.append(
+                f"ML-KEM-{param_set}: CCA attack is feasible (margin: {feasibility.get('margin', 'unknown')})"
+            )
+
+    # ========== CCA2 Resilience Analysis ==========
+    print("\n[6] CCA2 Resilience Against DF (COMPUTED + VERIFIED)")
+    print("-" * 70)
+
+    for param_set in [512, 768, 1024]:
+        resilience = df_analyzer.chosen_ciphertext_resilience(param_set)
+        print(f"\n{param_set}-bit scheme:")
+        print(f"  - Construction: {resilience['cca2_construction']}")
+        print(
+            f"  - FO re-encryption check: {resilience['re_encryption_check_prevents_leakage']}"
+        )
+
+        # VERIFICATION: FO must prevent leakage
+        if not resilience["re_encryption_check_prevents_leakage"]:
+            all_secure = False
+            vulnerability_findings.append(
+                f"ML-KEM-{param_set}: CCA2 resilience check failed"
+            )
+
+    # ========== COMPUTED SECURITY VERDICT ==========
     print("\n" + "=" * 70)
-    print("✅ ML-KEM remains secure against all analyzed attacks.")
+    if all_secure and not vulnerability_findings:
+        print("✅ ML-KEM SECURITY VERDICT: VERIFIED SECURE")
+        print("   All attack costs exceed security targets.")
+        print("   Fujisaki-Okamoto re-encryption check prevents DF leakage.")
+        print("   No feasible attacks found in analysis.")
+    else:
+        print("⚠️  ML-KEM SECURITY VERDICT: VULNERABILITIES DETECTED")
+        print("\nFindings:")
+        for finding in vulnerability_findings:
+            print(f"  - {finding}")
+
     print("=" * 70)
 
 
