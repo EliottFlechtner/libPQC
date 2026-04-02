@@ -13,21 +13,15 @@ This folder hosts vector-based conformance checks against KAT .rsp files.
 - Shared parser/discovery (canonical):
   - tests/conformance/common/rsp.py
   - tests/conformance/common/kat.py
+  - tests/conformance/common/utils.py
 - Scheme-specific loaders/adapters (canonical):
-  - tests/conformance/ml_kem/loader.py
-  - tests/conformance/ml_kem/adapter.py
-  - tests/conformance/ml_dsa/loader.py
-  - tests/conformance/ml_dsa/adapter.py
-- Backward-compatible wrappers remain in:
-  - tests/conformance/rsp.py
-  - tests/conformance/kat.py
-  - tests/conformance/ml_kem.py
-  - tests/conformance/ml_dsa.py
-  - tests/conformance/ml_kem_rsp_adapter.py
-  - tests/conformance/ml_dsa_rsp_adapter.py
+  - tests/conformance/ml_kem/vector_loader.py
+  - tests/conformance/ml_kem/rsp_byte_adapter.py
+  - tests/conformance/ml_dsa/vector_loader.py
+  - tests/conformance/ml_dsa/rsp_byte_adapter.py
 - Byte-adapter bridges:
-  - tests/conformance/ml_kem/adapter.py
-  - tests/conformance/ml_dsa/adapter.py
+  - tests/conformance/ml_kem/rsp_byte_adapter.py
+  - tests/conformance/ml_dsa/rsp_byte_adapter.py
 
 ## What These Tests Assert
 
@@ -94,8 +88,7 @@ smoke mode and full-record mode.
 
 ## Current Architecture
 
-Conformance is now organized by shared/common helpers and per-scheme packages,
-with compatibility wrappers left in place to avoid import breakage.
+Conformance is organized by shared/common helpers and per-scheme packages.
 
 Suggested layout:
 
@@ -104,12 +97,13 @@ tests/conformance/
   common/
     rsp.py
     kat.py
+    utils.py
   ml_kem/
-    loader.py
-    adapter.py
+    vector_loader.py
+    rsp_byte_adapter.py
   ml_dsa/
-    loader.py
-    adapter.py
+    vector_loader.py
+    rsp_byte_adapter.py
   test_ml_kem_kat.py
   test_ml_dsa_kat.py
   vectors/
