@@ -14,12 +14,12 @@ import unittest
 
 from src.schemes.ml_dsa.ml_dsa import ml_dsa_keygen, ml_dsa_sign, ml_dsa_verify
 from tests.conformance.common.kat import require_rsp_vectors
-from tests.conformance.ml_dsa.loader import (
-    load_ml_dsa_rsp,
-    ml_dsa_records_by_section,
+from tests.conformance.ml_dsa.vector_loader import (
+    load_ml_dsa_vector_records,
+    group_ml_dsa_vector_records,
     require_hex_field,
 )
-from tests.conformance.ml_dsa.adapter import (
+from tests.conformance.ml_dsa.rsp_byte_adapter import (
     ml_dsa_sig_to_rsp_bytes,
     ml_dsa_sk_to_rsp_bytes,
     ml_dsa_vk_to_rsp_bytes,
@@ -128,9 +128,9 @@ class TestMlDsaKat(unittest.TestCase):
 
     def test_vector_files_parse(self):
         for vector_file in self.vector_files:
-            records = load_ml_dsa_rsp(vector_file)
+            records = load_ml_dsa_vector_records(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
-            grouped = ml_dsa_records_by_section(vector_file)
+            grouped = group_ml_dsa_vector_records(vector_file)
             self.assertTrue(grouped)
 
     def test_vectors_match_implementation_bytes(self):
@@ -139,7 +139,7 @@ class TestMlDsaKat(unittest.TestCase):
         require_adapter_match = _require_adapter_match()
 
         for vector_file in self.vector_files:
-            records = load_ml_dsa_rsp(vector_file)
+            records = load_ml_dsa_vector_records(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
             total_records = len(records)
 

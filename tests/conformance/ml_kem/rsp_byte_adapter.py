@@ -1,8 +1,8 @@
-"""Adapters between internal ML-KEM payloads and RSP-style packed bytes.
+"""ML-KEM adapters from internal payload bytes to RSP packed bytes.
 
-The scheme implementation stores keys/ciphertexts as JSON payload bytes. NIST
-KAT files store compact packed byte strings. These helpers bridge that gap for
-comparison in conformance tests.
+The runtime implementation stores typed JSON payload bytes. NIST KAT files
+expect compact packed encodings. These helpers convert between the two forms so
+conformance tests can perform strict byte-for-byte comparisons.
 """
 
 from __future__ import annotations
@@ -14,36 +14,14 @@ from src.schemes.ml_kem.pke_utils import (
     pack_bits_le,
     resolve_params,
 )
-
-
-def _normalize_poly(coeffs: list[int], expected_degree: int) -> list[int]:
-    if len(coeffs) > expected_degree:
-        raise ValueError("polynomial degree exceeds expected degree")
-    if len(coeffs) < expected_degree:
-        coeffs = coeffs + [0] * (expected_degree - len(coeffs))
-    return coeffs
-
-
-def _require_module_entries(
-    payload: dict, expected_rank: int, expected_degree: int
-) -> list[list[int]]:
-    if not isinstance(payload, dict) or payload.get("type") != "module_element":
-        raise ValueError("module payload must be a module_element dictionary")
-
-    entries = payload.get("entries")
-    if not isinstance(entries, list) or len(entries) != expected_rank:
-        raise ValueError("module entry rank mismatch")
-
-    out: list[list[int]] = []
-    for coeffs in entries:
-        if not isinstance(coeffs, list):
-            raise ValueError("module entry polynomial degree mismatch")
-        out.append(_normalize_poly([int(c) for c in coeffs], expected_degree))
-    return out
+from tests.conformance.common.utils import (
+    normalize_polynomial_coeffs,
+    require_module_element_entries,
+)
 
 
 def ml_kem_ek_to_rsp_bytes(encapsulation_key: bytes, params: str | dict) -> bytes:
-    """Convert internal `ek` payload bytes to packed RSP public-key bytes."""
+    """Convert internal ``ek`` payload bytes to packed RSP public-key bytes."""
     resolved = resolve_params(params)
     n = resolved["n"]
 
@@ -58,12 +36,14 @@ def ml_kem_ek_to_rsp_bytes(encapsulation_key: bytes, params: str | dict) -> byte
     if not isinstance(t_payload, dict):
         raise ValueError("encapsulation key payload missing t")
 
-    t_entries = _require_module_entries(
+    t_entries = require_module_element_entries(
         t_payload,
         expected_rank=resolved["k"],
         expected_degree=n,
+        payload_name="encapsulation key t",
     )
-    # Reuse the same canonical key encoding helper used by runtime codepaths.
+
+    # Reuse the canonical public-key encoder from the scheme implementation.
     return encode_public_key_bytes(
         rho_hex=rho_hex,
         t_payload={
@@ -75,7 +55,7 @@ def ml_kem_ek_to_rsp_bytes(encapsulation_key: bytes, params: str | dict) -> byte
 
 
 def ml_kem_dk_to_rsp_bytes(decapsulation_key: bytes, params: str | dict) -> bytes:
-    """Convert internal `dk` payload bytes to packed RSP secret-key bytes."""
+    """Convert internal ``dk`` payload bytes to packed RSP secret-key bytes."""
     resolved = resolve_params(params)
     k = resolved["k"]
     n = resolved["n"]
@@ -97,7 +77,12 @@ def ml_kem_dk_to_rsp_bytes(decapsulation_key: bytes, params: str | dict) -> byte
     if not isinstance(z_hex, str):
         raise ValueError("decapsulation key payload missing z")
 
-    s_entries = _require_module_entries(s_payload, expected_rank=k, expected_degree=n)
+    s_entries = require_module_element_entries(
+        s_payload,
+        expected_rank=k,
+        expected_degree=n,
+        payload_name="decapsulation key s",
+    )
     s_packed = encode_polyvec_12(s_entries, degree=n)
 
     ek_bytes = serialization.to_bytes(ek_payload)
@@ -143,7 +128,9 @@ def ml_kem_ct_to_rsp_bytes(ciphertext: bytes, params: str | dict) -> bytes:
     for poly in c1_entries:
         if not isinstance(poly, list):
             raise ValueError("ciphertext c1 polynomial degree mismatch")
-        c1_packed.extend(pack_bits_le(_normalize_poly([int(c) for c in poly], n), du))
+        c1_norm = normalize_polynomial_coeffs([int(c) for c in poly], n)
+        c1_packed.extend(pack_bits_le(c1_norm, du))
 
-    c2_packed = pack_bits_le(_normalize_poly([int(c) for c in c2_coeffs], n), dv)
+    c2_norm = normalize_polynomial_coeffs([int(c) for c in c2_coeffs], n)
+    c2_packed = pack_bits_le(c2_norm, dv)
     return bytes(c1_packed) + c2_packed

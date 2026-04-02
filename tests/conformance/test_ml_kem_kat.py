@@ -13,12 +13,12 @@ import unittest
 
 from src.schemes.ml_kem.ml_kem import ml_kem_decaps, ml_kem_encaps, ml_kem_keygen
 from tests.conformance.common.kat import require_rsp_vectors
-from tests.conformance.ml_kem.loader import (
-    load_ml_kem_rsp,
-    ml_kem_records_by_section,
+from tests.conformance.ml_kem.vector_loader import (
+    load_ml_kem_vector_records,
+    group_ml_kem_vector_records,
     require_hex_field,
 )
-from tests.conformance.ml_kem.adapter import (
+from tests.conformance.ml_kem.rsp_byte_adapter import (
     ml_kem_ct_to_rsp_bytes,
     ml_kem_dk_to_rsp_bytes,
     ml_kem_ek_to_rsp_bytes,
@@ -71,9 +71,9 @@ class TestMlKemKat(unittest.TestCase):
 
     def test_vector_files_parse(self):
         for vector_file in self.vector_files:
-            records = load_ml_kem_rsp(vector_file)
+            records = load_ml_kem_vector_records(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
-            grouped = ml_kem_records_by_section(vector_file)
+            grouped = group_ml_kem_vector_records(vector_file)
             self.assertTrue(grouped)
 
     def test_vectors_match_implementation_bytes(self):
@@ -81,7 +81,7 @@ class TestMlKemKat(unittest.TestCase):
         require_full = _require_full_processing()
 
         for vector_file in self.vector_files:
-            records = load_ml_kem_rsp(vector_file)
+            records = load_ml_kem_vector_records(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
             total_records = len(records)
 
