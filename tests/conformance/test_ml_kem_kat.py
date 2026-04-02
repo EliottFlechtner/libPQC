@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 import unittest
 
 from src.schemes.ml_kem.ml_kem import ml_kem_decaps, ml_kem_encaps, ml_kem_keygen
@@ -58,6 +59,21 @@ def _show_progress() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def _show_timing() -> bool:
+    raw = os.getenv("LIBPQC_KAT_TIMING", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _vector_file_filter() -> re.Pattern[str] | None:
+    raw = os.getenv("LIBPQC_KAT_VECTOR_FILTER", "").strip()
+    if not raw:
+        return None
+    try:
+        return re.compile(raw, re.IGNORECASE)
+    except re.error as exc:
+        raise ValueError("LIBPQC_KAT_VECTOR_FILTER must be a valid regex") from exc
+
+
 class TestMlKemKat(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -81,8 +97,12 @@ class TestMlKemKat(unittest.TestCase):
     def test_vectors_match_implementation_bytes(self):
         max_records = _max_records()
         require_full = _require_full_processing()
+        vector_filter = _vector_file_filter()
 
         for vector_file in self.vector_files:
+            if vector_filter and not vector_filter.search(vector_file.name):
+                continue
+
             records = load_ml_kem_vector_records(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
             total_records = len(records)
@@ -102,6 +122,8 @@ class TestMlKemKat(unittest.TestCase):
             tested = 0
             processed = 0
             show_progress = _show_progress()
+            show_timing = _show_timing()
+            file_start = time.perf_counter()
 
             if show_progress:
                 print(
@@ -152,10 +174,12 @@ class TestMlKemKat(unittest.TestCase):
 
                     tested += 1
 
-            if show_progress:
+            if show_progress or show_timing:
+                elapsed_s = time.perf_counter() - file_start
                 print(
                     f"[ML-KEM] {vector_file.name}: done "
-                    f"(processed={processed}, tested={tested}, total={total_records})",
+                    f"(processed={processed}, tested={tested}, total={total_records}, "
+                    f"elapsed_s={elapsed_s:.3f})",
                     flush=True,
                 )
 
