@@ -1,8 +1,8 @@
-"""Adapters between internal ML-DSA payloads and RSP-style packed bytes.
+"""ML-DSA adapters from internal payload bytes to RSP packed bytes.
 
-The scheme implementation stores keys/signatures as JSON payload bytes. NIST
-KAT files store compact packed byte strings. These helpers bridge that gap for
-comparison in conformance tests.
+The runtime implementation stores typed JSON payload bytes. NIST KAT files
+expect compact packed encodings. These helpers convert between the two forms so
+conformance tests can perform strict byte-for-byte comparisons.
 """
 
 from __future__ import annotations
@@ -10,39 +10,17 @@ from __future__ import annotations
 from src.core import serialization
 from src.schemes.ml_dsa.sign_verify_utils import resolve_ml_dsa_sign_params
 from src.schemes.ml_kem.pke_utils import pack_bits_le
+from tests.conformance.common.utils import require_module_element_entries
 
 
 def _centered_mod(value: int, modulus: int) -> int:
+    """Map integer values into a centered representative modulo ``modulus``."""
+
     reduced = int(value) % modulus
     half = modulus // 2
     if reduced > half:
         reduced -= modulus
     return reduced
-
-
-def _require_module_entries(
-    payload: dict,
-    expected_rank: int,
-    expected_degree: int,
-) -> list[list[int]]:
-    if not isinstance(payload, dict) or payload.get("type") != "module_element":
-        raise ValueError("module payload must be a module_element dictionary")
-
-    entries = payload.get("entries")
-    if not isinstance(entries, list) or len(entries) != expected_rank:
-        raise ValueError("module entry rank mismatch")
-
-    out: list[list[int]] = []
-    for coeffs in entries:
-        if not isinstance(coeffs, list):
-            raise ValueError("module entry polynomial degree mismatch")
-        normalized = [int(c) for c in coeffs]
-        if len(normalized) > expected_degree:
-            raise ValueError("module entry polynomial degree mismatch")
-        if len(normalized) < expected_degree:
-            normalized = normalized + [0] * (expected_degree - len(normalized))
-        out.append(normalized)
-    return out
 
 
 def _pack_t1_poly(coeffs: list[int]) -> bytes:
@@ -82,6 +60,8 @@ def _pack_z_poly(coeffs: list[int], gamma1: int, q: int) -> bytes:
 
 
 def _pack_hint(hint_payload: dict, k: int, n: int, omega: int) -> bytes:
+    """Pack hint rows into compact byte format used by ML-DSA vectors."""
+
     if not isinstance(hint_payload, dict) or hint_payload.get("type") != "ml_dsa_hint":
         raise ValueError("invalid hint payload")
 
@@ -117,10 +97,13 @@ def _pack_hint(hint_payload: dict, k: int, n: int, omega: int) -> bytes:
 
 
 def ml_dsa_vk_to_rsp_bytes(verification_key: bytes, params: str | dict) -> bytes:
+    """Convert internal verification-key payload bytes to RSP packed bytes."""
+
     resolved = resolve_ml_dsa_sign_params(params)
     k = resolved["k"]
     n = resolved["n"]
 
+    # Internal representation is a tagged JSON payload encoded as bytes.
     payload = serialization.from_bytes(verification_key)
     if payload.get("type") != "ml_dsa_verification_key":
         raise ValueError("invalid verification key payload type")
@@ -133,16 +116,24 @@ def ml_dsa_vk_to_rsp_bytes(verification_key: bytes, params: str | dict) -> bytes
         raise ValueError("verification key payload missing t1")
 
     rho = bytes.fromhex(rho_hex)
-    t1_entries = _require_module_entries(t1_payload, expected_rank=k, expected_degree=n)
+    t1_entries = require_module_element_entries(
+        t1_payload,
+        expected_rank=k,
+        expected_degree=n,
+        payload_name="verification key t1",
+    )
 
     packed_t1 = bytearray()
     for coeffs in t1_entries:
         packed_t1.extend(_pack_t1_poly(coeffs))
 
+    # RSP verification-key layout: rho || packed(t1).
     return rho + bytes(packed_t1)
 
 
 def ml_dsa_sk_to_rsp_bytes(signing_key: bytes, params: str | dict) -> bytes:
+    """Convert internal signing-key payload bytes to RSP packed bytes."""
+
     resolved = resolve_ml_dsa_sign_params(params)
     k = resolved["k"]
     l = resolved["l"]
@@ -151,6 +142,7 @@ def ml_dsa_sk_to_rsp_bytes(signing_key: bytes, params: str | dict) -> bytes:
     eta = resolved["eta"]
     d = resolved["d"]
 
+    # Decode and validate the expected signing-key payload envelope.
     payload = serialization.from_bytes(signing_key)
     if payload.get("type") != "ml_dsa_signing_key":
         raise ValueError("invalid signing key payload type")
@@ -179,9 +171,24 @@ def ml_dsa_sk_to_rsp_bytes(signing_key: bytes, params: str | dict) -> bytes:
     k_seed = bytes.fromhex(k_hex)
     tr = bytes.fromhex(tr_hex)
 
-    s1_entries = _require_module_entries(s1_payload, expected_rank=l, expected_degree=n)
-    s2_entries = _require_module_entries(s2_payload, expected_rank=k, expected_degree=n)
-    t0_entries = _require_module_entries(t0_payload, expected_rank=k, expected_degree=n)
+    s1_entries = require_module_element_entries(
+        s1_payload,
+        expected_rank=l,
+        expected_degree=n,
+        payload_name="signing key s1",
+    )
+    s2_entries = require_module_element_entries(
+        s2_payload,
+        expected_rank=k,
+        expected_degree=n,
+        payload_name="signing key s2",
+    )
+    t0_entries = require_module_element_entries(
+        t0_payload,
+        expected_rank=k,
+        expected_degree=n,
+        payload_name="signing key t0",
+    )
 
     packed_s1 = bytearray()
     for coeffs in s1_entries:
@@ -195,10 +202,13 @@ def ml_dsa_sk_to_rsp_bytes(signing_key: bytes, params: str | dict) -> bytes:
     for coeffs in t0_entries:
         packed_t0.extend(_pack_t0_poly(coeffs, d=d, q=q))
 
+    # RSP signing-key layout: rho || K || tr || s1 || s2 || t0.
     return rho + k_seed + tr + bytes(packed_s1) + bytes(packed_s2) + bytes(packed_t0)
 
 
 def ml_dsa_sig_to_rsp_bytes(signature: bytes, params: str | dict) -> bytes:
+    """Convert internal signature payload bytes to RSP packed bytes."""
+
     resolved = resolve_ml_dsa_sign_params(params)
     k = resolved["k"]
     l = resolved["l"]
@@ -208,6 +218,7 @@ def ml_dsa_sig_to_rsp_bytes(signature: bytes, params: str | dict) -> bytes:
     omega = resolved["omega"]
     lambda_bits = resolved["lambda"]
 
+    # Convert runtime signature envelope to packed c_tilde || z || h bytes.
     payload = serialization.from_bytes(signature)
     if payload.get("type") != "ml_dsa_signature":
         raise ValueError("invalid signature payload type")
@@ -227,7 +238,12 @@ def ml_dsa_sig_to_rsp_bytes(signature: bytes, params: str | dict) -> bytes:
     if len(c_tilde) != expected_c_tilde_len:
         raise ValueError("signature challenge length mismatch")
 
-    z_entries = _require_module_entries(z_payload, expected_rank=l, expected_degree=n)
+    z_entries = require_module_element_entries(
+        z_payload,
+        expected_rank=l,
+        expected_degree=n,
+        payload_name="signature z",
+    )
 
     packed_z = bytearray()
     for coeffs in z_entries:

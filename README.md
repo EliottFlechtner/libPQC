@@ -63,47 +63,52 @@ This first release ships a working, tested, educational implementation of:
 ```text
 src/
   core/
-    integers.py
-    polynomials.py
-    module.py
-    ntt.py
-    sampling.py
-    serialization.py
+    integers.py           # integer ring arithmetic
+    polynomials.py        # polynomial ring operations
+    module.py             # module arithmetic
+    ntt.py                # number-theoretic transform
+    sampling.py           # sampling utilities (CBD, uniform)
+    serialization.py      # byte serialization helpers
 
   schemes/
+    utils.py              # shared utilities (CRH, XOF, PRF)
     ml_kem/
-      kyber_pke.py      # active PKE implementation
-      pke_utils.py
-      vectors.py
-      params.py
-      keygen.py         # KEM keygen (ek, dk packaging)
-      encaps.py         # KEM encapsulation
-      decaps.py         # KEM decapsulation
-      ml_kem.py         # canonical high-level exports
-      hashes.py         # G/H/J and K/R derivation
+      kyber_pke.py        # PKE foundation layer
+      pke_utils.py        # PKE helper functions
+      vectors.py          # matrix/vector definitions
+      params.py           # ML-KEM parameter presets
+      kyber_ntt.py        # NTT-based operations for ML-KEM
+      kyber_sampling.py   # ML-KEM-specific sampling
+      keygen.py           # KEM key generation
+      encaps.py           # KEM encapsulation
+      decaps.py           # KEM decapsulation
+      hashes.py           # G/H/J hash and derivation functions
+      ml_kem.py           # canonical high-level exports
 
     ml_dsa/
-      keygen.py
-      sign.py
-      verify.py
-      sign_verify_utils.py
-      params.py
-      ml_dsa.py         # canonical high-level exports
+      params.py           # ML-DSA parameter presets
+      keygen.py           # key generation
+      sign.py             # signing logic
+      verify.py           # verification logic
+      sign_verify_utils.py # signing/verification utilities
+      ml_dsa.py           # canonical high-level exports
 
-  comms/                # scaffolding
-  experiments/          # scaffolding
-  app/                  # scaffolding
+  comms/                  # scaffolding
+  experiments/            # scaffolding
+  app/                    # scaffolding
 
 tests/
   core/
-    test_*.py
+    test_*.py             # core algebra tests
   schemes/
     ml_kem/
-      test_*.py
+      test_*.py           # ML-KEM tests
     ml_dsa/
-      test_*.py
+      test_*.py           # ML-DSA tests
   integration/
-    test_*.py
+    test_*.py             # end-to-end tests
+  conformance/
+    test_*.py             # KAT conformance suites
 ```
 
 ## Quick Start
@@ -188,14 +193,63 @@ LIBPQC_KAT_MAX_RECORDS=1000 LIBPQC_KAT_REQUIRE_FULL=1 \
 python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py
 ```
 
+Run quick KAT smoke checks (2 records per vector file) with progress + timing:
+
+```bash
+LIBPQC_KAT_MAX_RECORDS=2 LIBPQC_KAT_PROGRESS=1 LIBPQC_KAT_TIMING=1 \
+python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py
+```
+
+Generate a per-vector conformance summary (pass/fail, processed count, elapsed):
+
+```bash
+python3 scripts/conformance_summary.py --max-records 2
+```
+
+Full-vector summary mode:
+
+```bash
+python3 scripts/conformance_summary.py --max-records 1000 --full
+```
+
 Useful runtime controls:
 
 - `LIBPQC_KAT_MAX_RECORDS`: max records to process per vector file
 - `LIBPQC_KAT_REQUIRE_FULL`: enforce processing of every record in each file
 - `LIBPQC_KAT_PROGRESS`: print per-file progress counters
+- `LIBPQC_KAT_TIMING`: print per-file elapsed seconds in completion output
+- `LIBPQC_KAT_VECTOR_FILTER`: optional regex filter for vector file names
+
+CI behavior:
+
+- Pull requests and non-scheduled CI runs execute reduced conformance smoke mode (`LIBPQC_KAT_MAX_RECORDS=2`).
+- Nightly scheduled CI executes strict full-vector conformance (`LIBPQC_KAT_MAX_RECORDS=1000` + `LIBPQC_KAT_REQUIRE_FULL=1`).
 
 For details on conformance helpers, adapter layers, and suggested folder architecture,
 see `tests/conformance/README.md`.
+
+### Current KAT Status (Verified)
+
+As of 2026-04-02, both conformance suites pass against the currently checked-in
+vector corpus (`tests/conformance/vectors/ml_kem/*.rsp` and
+`tests/conformance/vectors/ml_dsa/*.rsp`).
+
+Verified runs:
+
+- default mode
+  - `python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py`
+  - result: `Ran 6 tests ... OK`
+- strict full-vector mode
+  - `LIBPQC_KAT_MAX_RECORDS=1000 LIBPQC_KAT_REQUIRE_FULL=1 python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py`
+  - result: `Ran 6 tests ... OK`
+
+What this currently guarantees:
+
+- ML-KEM vector comparisons pass for packed public key, packed secret key,
+  ciphertext bytes, and shared secret checks.
+- ML-DSA vector comparisons pass for packed verification/signing keys,
+  signature bytes, and verification acceptance for the vector-specific message
+  domain handling (`raw`, `pure`, `hashed`, and hedged/deterministic modes).
 
 ## Coverage
 
@@ -249,7 +303,6 @@ Implemented in this release:
 
 Next priorities:
 
-- vector-based conformance checks against official KATs
 - performance profiling and optional optimized paths
 - richer protocol-level examples (key exchange + signed channel skeleton)
 - API stabilization and packaging improvements

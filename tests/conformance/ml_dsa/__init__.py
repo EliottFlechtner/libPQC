@@ -1,15 +1,19 @@
 """ML-DSA conformance helpers."""
 
-from .adapter import (
+from .rsp_byte_adapter import (
     ml_dsa_sig_to_rsp_bytes,
     ml_dsa_sk_to_rsp_bytes,
     ml_dsa_vk_to_rsp_bytes,
 )
-from .loader import load_ml_dsa_rsp, ml_dsa_records_by_section, require_hex_field
+from .vector_loader import (
+    group_ml_dsa_vector_records,
+    load_ml_dsa_vector_records,
+    require_hex_field,
+)
 
 __all__ = [
-    "load_ml_dsa_rsp",
-    "ml_dsa_records_by_section",
+    "load_ml_dsa_vector_records",
+    "group_ml_dsa_vector_records",
     "require_hex_field",
     "ml_dsa_vk_to_rsp_bytes",
     "ml_dsa_sk_to_rsp_bytes",

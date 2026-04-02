@@ -1,5 +1,9 @@
 # Conformance Test Guide
 
+[![KAT Smoke](https://img.shields.io/badge/KAT%20smoke-pass-brightgreen)](#verified-status)
+[![KAT Full](https://img.shields.io/badge/KAT%20full--vector-pass-brightgreen)](#verified-status)
+[![Last Verified](https://img.shields.io/badge/verified-2026--04--02-blue)](#verified-status)
+
 This folder hosts vector-based conformance checks against KAT .rsp files.
 
 ## Scope
@@ -9,21 +13,26 @@ This folder hosts vector-based conformance checks against KAT .rsp files.
 - Shared parser/discovery (canonical):
   - tests/conformance/common/rsp.py
   - tests/conformance/common/kat.py
+  - tests/conformance/common/utils.py
 - Scheme-specific loaders/adapters (canonical):
-  - tests/conformance/ml_kem/loader.py
-  - tests/conformance/ml_kem/adapter.py
-  - tests/conformance/ml_dsa/loader.py
-  - tests/conformance/ml_dsa/adapter.py
-- Backward-compatible wrappers remain in:
-  - tests/conformance/rsp.py
-  - tests/conformance/kat.py
-  - tests/conformance/ml_kem.py
-  - tests/conformance/ml_dsa.py
-  - tests/conformance/ml_kem_rsp_adapter.py
-  - tests/conformance/ml_dsa_rsp_adapter.py
+  - tests/conformance/ml_kem/vector_loader.py
+  - tests/conformance/ml_kem/rsp_byte_adapter.py
+  - tests/conformance/ml_dsa/vector_loader.py
+  - tests/conformance/ml_dsa/rsp_byte_adapter.py
 - Byte-adapter bridges:
-  - tests/conformance/ml_kem/adapter.py
-  - tests/conformance/ml_dsa/adapter.py
+  - tests/conformance/ml_kem/rsp_byte_adapter.py
+  - tests/conformance/ml_dsa/rsp_byte_adapter.py
+
+## What These Tests Assert
+
+- RSP parsing is stable for comment lines, section headers, blank-line record
+  separators, and repeated-key record boundaries.
+- ML-KEM vectors validate deterministic key generation, encapsulation
+  ciphertext bytes, and shared-secret agreement on encaps/decaps.
+- ML-DSA vectors validate deterministic key generation, signature bytes, and
+  successful verification for the vector-defined external message format.
+- Adapter modules explicitly map internal JSON payload encodings into compact
+  packed KAT byte layouts before byte-for-byte comparisons.
 
 ## Running
 
@@ -46,6 +55,25 @@ Progress output:
 LIBPQC_KAT_PROGRESS=1 python3 -m unittest tests/conformance/test_ml_kem_kat.py
 ```
 
+Per-file timing output:
+
+```bash
+LIBPQC_KAT_PROGRESS=1 LIBPQC_KAT_TIMING=1 \
+python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py
+```
+
+Conformance summary script (pass/fail + processed counts by vector file):
+
+```bash
+python3 scripts/conformance_summary.py --max-records 2
+```
+
+Full-vector summary mode:
+
+```bash
+python3 scripts/conformance_summary.py --max-records 1000 --full
+```
+
 ## Environment Knobs
 
 - LIBPQC_KAT_MAX_RECORDS
@@ -55,13 +83,43 @@ LIBPQC_KAT_PROGRESS=1 python3 -m unittest tests/conformance/test_ml_kem_kat.py
   - If enabled, test fails unless all records in each file were processed.
 - LIBPQC_KAT_PROGRESS
   - If enabled, prints running counters per vector file.
+- LIBPQC_KAT_TIMING
+  - If enabled, prints per-file elapsed seconds in completion output.
+- LIBPQC_KAT_VECTOR_FILTER
+  - Optional regex used to include only matching vector file names.
 - LIBPQC_KAT_REQUIRE_ADAPTER_MATCH (ML-DSA)
   - Controls strict adapter mismatch behavior in the ML-DSA suite.
 
+## Verified Status
+
+Validated on 2026-04-02 with repository vectors currently checked in:
+
+| Suite | Mode | Vector files | Result |
+|---|---|---:|---|
+| ML-KEM + ML-DSA conformance | smoke/default | 21 (3 ML-KEM, 18 ML-DSA) | pass |
+| ML-KEM + ML-DSA conformance | strict full-vector | 21 (3 ML-KEM, 18 ML-DSA) | pass |
+
+- default conformance mode:
+  - `python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py`
+  - result: `Ran 6 tests ... OK`
+- strict full-vector mode:
+  - `LIBPQC_KAT_MAX_RECORDS=1000 LIBPQC_KAT_REQUIRE_FULL=1 python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py`
+  - result: `Ran 6 tests ... OK`
+
+This confirms the checked-in ML-KEM and ML-DSA KAT vector suites pass in both
+smoke mode and full-record mode.
+
+## CI Behavior
+
+- Pull requests and non-scheduled CI runs execute conformance in reduced
+  smoke mode (`LIBPQC_KAT_MAX_RECORDS=2`).
+- Nightly scheduled CI runs execute strict full-vector conformance
+  (`LIBPQC_KAT_MAX_RECORDS=1000` + `LIBPQC_KAT_REQUIRE_FULL=1`).
+- Both modes enable progress and timing output for observability.
+
 ## Current Architecture
 
-Conformance is now organized by shared/common helpers and per-scheme packages,
-with compatibility wrappers left in place to avoid import breakage.
+Conformance is organized by shared/common helpers and per-scheme packages.
 
 Suggested layout:
 
@@ -70,12 +128,13 @@ tests/conformance/
   common/
     rsp.py
     kat.py
+    utils.py
   ml_kem/
-    loader.py
-    adapter.py
+    vector_loader.py
+    rsp_byte_adapter.py
   ml_dsa/
-    loader.py
-    adapter.py
+    vector_loader.py
+    rsp_byte_adapter.py
   test_ml_kem_kat.py
   test_ml_dsa_kat.py
   vectors/
@@ -88,8 +147,6 @@ adapter and test behavior.
 
 ## Practical Next Improvements
 
-1. Add a small conformance summary script that prints pass/fail and processed
-   record counts for each vector file.
-2. Add CI job step for full conformance mode on a schedule (nightly), while
-   keeping PR CI on reduced max-record smoke mode.
-3. Add per-file timing output for performance tracking during KAT runs.
+1. Persist summary-script output as a CI artifact for easier historical review.
+2. Add thresholds/alerts for conformance timing regressions over time.
+3. Add optional JSON output mode for `scripts/conformance_summary.py`.

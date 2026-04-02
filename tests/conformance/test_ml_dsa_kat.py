@@ -10,16 +10,17 @@ from __future__ import annotations
 import os
 import re
 import hashlib
+import time
 import unittest
 
 from src.schemes.ml_dsa.ml_dsa import ml_dsa_keygen, ml_dsa_sign, ml_dsa_verify
 from tests.conformance.common.kat import require_rsp_vectors
-from tests.conformance.ml_dsa.loader import (
-    load_ml_dsa_rsp,
-    ml_dsa_records_by_section,
+from tests.conformance.ml_dsa.vector_loader import (
+    load_ml_dsa_vector_records,
+    group_ml_dsa_vector_records,
     require_hex_field,
 )
-from tests.conformance.ml_dsa.adapter import (
+from tests.conformance.ml_dsa.rsp_byte_adapter import (
     ml_dsa_sig_to_rsp_bytes,
     ml_dsa_sk_to_rsp_bytes,
     ml_dsa_vk_to_rsp_bytes,
@@ -37,6 +38,8 @@ def _params_from_filename(name: str) -> str:
 
 
 def _max_records() -> int:
+    # Default to a small cap for fast local iteration. CI/full checks can raise
+    # this via environment variable.
     raw = os.getenv("LIBPQC_KAT_MAX_RECORDS", "5")
     try:
         value = int(raw)
@@ -55,6 +58,21 @@ def _require_full_processing() -> bool:
 def _show_progress() -> bool:
     raw = os.getenv("LIBPQC_KAT_PROGRESS", "0").strip().lower()
     return raw in {"1", "true", "yes", "on"}
+
+
+def _show_timing() -> bool:
+    raw = os.getenv("LIBPQC_KAT_TIMING", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _vector_file_filter() -> re.Pattern[str] | None:
+    raw = os.getenv("LIBPQC_KAT_VECTOR_FILTER", "").strip()
+    if not raw:
+        return None
+    try:
+        return re.compile(raw, re.IGNORECASE)
+    except re.error as exc:
+        raise ValueError("LIBPQC_KAT_VECTOR_FILTER must be a valid regex") from exc
 
 
 def _require_adapter_match() -> bool:
@@ -117,6 +135,7 @@ class TestMlDsaKat(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         try:
+            # Discover all checked-in vector files for this scheme.
             cls.vector_files = require_rsp_vectors("ml_dsa")
         except FileNotFoundError as exc:
             raise unittest.SkipTest(str(exc)) from exc
@@ -125,19 +144,24 @@ class TestMlDsaKat(unittest.TestCase):
         self.assertTrue(self.vector_files)
 
     def test_vector_files_parse(self):
+        # Sanity-check parser behavior before running expensive byte checks.
         for vector_file in self.vector_files:
-            records = load_ml_dsa_rsp(vector_file)
+            records = load_ml_dsa_vector_records(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
-            grouped = ml_dsa_records_by_section(vector_file)
+            grouped = group_ml_dsa_vector_records(vector_file)
             self.assertTrue(grouped)
 
     def test_vectors_match_implementation_bytes(self):
         max_records = _max_records()
         require_full = _require_full_processing()
         require_adapter_match = _require_adapter_match()
+        vector_filter = _vector_file_filter()
 
         for vector_file in self.vector_files:
-            records = load_ml_dsa_rsp(vector_file)
+            if vector_filter and not vector_filter.search(vector_file.name):
+                continue
+
+            records = load_ml_dsa_vector_records(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
             total_records = len(records)
 
@@ -158,6 +182,8 @@ class TestMlDsaKat(unittest.TestCase):
             strict_matches = 0
             adapter_mismatches = 0
             show_progress = _show_progress()
+            show_timing = _show_timing()
+            file_start = time.perf_counter()
 
             if show_progress:
                 print(
@@ -167,6 +193,7 @@ class TestMlDsaKat(unittest.TestCase):
                 )
 
             for record in records:
+                # Cap work per file for fast local loops.
                 if processed >= _max_records():
                     break
 
@@ -196,6 +223,8 @@ class TestMlDsaKat(unittest.TestCase):
                         message=msg,
                         context=context,
                     )
+                    # Hedged vectors supply per-record randomness; deterministic
+                    # vectors use a fixed all-zero seed.
                     signing_rnd = (
                         require_hex_field(record, "rng")
                         if _is_hedged_vector(vector_file.name)
@@ -236,6 +265,8 @@ class TestMlDsaKat(unittest.TestCase):
                         adapter_mismatches += 1
                         self.assertEqual(actual_sig, expected_sig)
                     self.assertTrue(
+                        # Verify against the original internal representation to
+                        # ensure signing/verification logic is self-consistent.
                         ml_dsa_verify(
                             signing_message,
                             signature,
@@ -247,6 +278,7 @@ class TestMlDsaKat(unittest.TestCase):
                     tested += 1
 
             if require_full:
+                # Enforce strict mode expectation: every record in file checked.
                 self.assertEqual(
                     processed,
                     total_records,
@@ -257,13 +289,14 @@ class TestMlDsaKat(unittest.TestCase):
                     ),
                 )
 
-            if show_progress:
+            if show_progress or show_timing:
+                elapsed_s = time.perf_counter() - file_start
                 print(
                     f"[ML-DSA] {vector_file.name}: done "
                     f"(processed={processed}, tested={tested}, "
                     f"strict_matches={strict_matches}, "
                     f"adapter_mismatches={adapter_mismatches}, "
-                    f"total={total_records})",
+                    f"total={total_records}, elapsed_s={elapsed_s:.3f})",
                     flush=True,
                 )
             self.assertGreater(

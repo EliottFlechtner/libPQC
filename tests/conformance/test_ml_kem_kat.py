@@ -9,16 +9,17 @@ from __future__ import annotations
 
 import os
 import re
+import time
 import unittest
 
 from src.schemes.ml_kem.ml_kem import ml_kem_decaps, ml_kem_encaps, ml_kem_keygen
 from tests.conformance.common.kat import require_rsp_vectors
-from tests.conformance.ml_kem.loader import (
-    load_ml_kem_rsp,
-    ml_kem_records_by_section,
+from tests.conformance.ml_kem.vector_loader import (
+    load_ml_kem_vector_records,
+    group_ml_kem_vector_records,
     require_hex_field,
 )
-from tests.conformance.ml_kem.adapter import (
+from tests.conformance.ml_kem.rsp_byte_adapter import (
     ml_kem_ct_to_rsp_bytes,
     ml_kem_dk_to_rsp_bytes,
     ml_kem_ek_to_rsp_bytes,
@@ -36,6 +37,8 @@ def _params_from_filename(name: str) -> str:
 
 
 def _max_records() -> int:
+    # Default to a small cap for fast local iteration. CI/full checks can raise
+    # this via environment variable.
     raw = os.getenv("LIBPQC_KAT_MAX_RECORDS", "5")
     try:
         value = int(raw)
@@ -56,10 +59,26 @@ def _show_progress() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def _show_timing() -> bool:
+    raw = os.getenv("LIBPQC_KAT_TIMING", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _vector_file_filter() -> re.Pattern[str] | None:
+    raw = os.getenv("LIBPQC_KAT_VECTOR_FILTER", "").strip()
+    if not raw:
+        return None
+    try:
+        return re.compile(raw, re.IGNORECASE)
+    except re.error as exc:
+        raise ValueError("LIBPQC_KAT_VECTOR_FILTER must be a valid regex") from exc
+
+
 class TestMlKemKat(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         try:
+            # Discover all checked-in vector files for this scheme.
             cls.vector_files = require_rsp_vectors("ml_kem")
         except FileNotFoundError as exc:
             raise unittest.SkipTest(str(exc)) from exc
@@ -68,18 +87,23 @@ class TestMlKemKat(unittest.TestCase):
         self.assertTrue(self.vector_files)
 
     def test_vector_files_parse(self):
+        # Sanity-check parser behavior before running expensive byte checks.
         for vector_file in self.vector_files:
-            records = load_ml_kem_rsp(vector_file)
+            records = load_ml_kem_vector_records(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
-            grouped = ml_kem_records_by_section(vector_file)
+            grouped = group_ml_kem_vector_records(vector_file)
             self.assertTrue(grouped)
 
     def test_vectors_match_implementation_bytes(self):
         max_records = _max_records()
         require_full = _require_full_processing()
+        vector_filter = _vector_file_filter()
 
         for vector_file in self.vector_files:
-            records = load_ml_kem_rsp(vector_file)
+            if vector_filter and not vector_filter.search(vector_file.name):
+                continue
+
+            records = load_ml_kem_vector_records(vector_file)
             self.assertTrue(records, msg=f"{vector_file} did not contain any records")
             total_records = len(records)
 
@@ -98,6 +122,8 @@ class TestMlKemKat(unittest.TestCase):
             tested = 0
             processed = 0
             show_progress = _show_progress()
+            show_timing = _show_timing()
+            file_start = time.perf_counter()
 
             if show_progress:
                 print(
@@ -107,6 +133,7 @@ class TestMlKemKat(unittest.TestCase):
                 )
 
             for record in records:
+                # Cap work per file for fast local loops.
                 if processed >= max_records:
                     break
 
@@ -126,8 +153,10 @@ class TestMlKemKat(unittest.TestCase):
                     expected_ct = require_hex_field(record, "ct")
                     expected_ss = require_hex_field(record, "ss")
 
+                    # Reconstruct deterministic keypair from vector seeds.
                     ek, dk = ml_kem_keygen(params=params, aseed=d, zseed=z)
 
+                    # Adapt internal payloads to FIPS/NIST packed byte format.
                     actual_pk = ml_kem_ek_to_rsp_bytes(ek, params=params)
                     actual_sk = ml_kem_dk_to_rsp_bytes(dk, params=params)
 
@@ -145,14 +174,17 @@ class TestMlKemKat(unittest.TestCase):
 
                     tested += 1
 
-            if show_progress:
+            if show_progress or show_timing:
+                elapsed_s = time.perf_counter() - file_start
                 print(
                     f"[ML-KEM] {vector_file.name}: done "
-                    f"(processed={processed}, tested={tested}, total={total_records})",
+                    f"(processed={processed}, tested={tested}, total={total_records}, "
+                    f"elapsed_s={elapsed_s:.3f})",
                     flush=True,
                 )
 
             if require_full:
+                # Enforce strict mode expectation: every record in file checked.
                 self.assertEqual(
                     processed,
                     total_records,

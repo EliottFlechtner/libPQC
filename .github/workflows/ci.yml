@@ -76,6 +76,18 @@ jobs:
             python -m unittest discover -s tests -p 'test_*.py'
           fi
 
+      - name: Conformance smoke (reduced records)
+        if: matrix.python-version == '3.12' && github.event_name != 'schedule'
+        run: |
+          LIBPQC_KAT_MAX_RECORDS=2 LIBPQC_KAT_PROGRESS=1 LIBPQC_KAT_TIMING=1 \
+          python -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py
+
+      - name: Conformance full-vector (nightly)
+        if: matrix.python-version == '3.12' && github.event_name == 'schedule'
+        run: |
+          LIBPQC_KAT_MAX_RECORDS=1000 LIBPQC_KAT_REQUIRE_FULL=1 LIBPQC_KAT_PROGRESS=1 LIBPQC_KAT_TIMING=1 \
+          python -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py
+
       - name: Coverage summary
         if: matrix.python-version == '3.12'
         run: coverage report -m
