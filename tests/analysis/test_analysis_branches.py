@@ -1,6 +1,12 @@
 """Targeted branch tests for analysis modules."""
 
+import sys
+from pathlib import Path
 import unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from src.analysis.lattice_attacks import BKZ_Algorithm
 from src.analysis.ml_dsa_attacks import (

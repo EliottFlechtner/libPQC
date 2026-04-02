@@ -4,7 +4,14 @@ Comprehensive tests to achieve 100% code coverage.
 Covers all branches and edge cases in analysis and crypto modules.
 """
 
+import sys
+from pathlib import Path
 import unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from src.analysis.cost_calculator import (
     AttackCost,
     ClassicalBitOperations,
