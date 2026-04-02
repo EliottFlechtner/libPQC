@@ -1,77 +1,44 @@
-"""Targeted branch tests for remaining uncovered lines."""
+"""Targeted branch tests for scheme modules."""
 
 import unittest
 from unittest.mock import patch
 
-from src.analysis.lattice_attacks import BKZ_Algorithm
-from src.analysis.ml_dsa_attacks import (
-    ForgeryResistanceAnalyzer,
-    ML_DSA_AttackAnalysis,
-)
-from src.analysis.ml_kem_attacks import ML_KEM_AttackAnalysis
+from src.core import serialization
 from src.core.integers import IntegersRing
 from src.core.module import Module
 from src.core.polynomials import QuotientPolynomialRing
-from src.core import serialization
 from src.schemes.ml_dsa import ml_dsa_keygen, ml_dsa_sign
 from src.schemes.ml_dsa.sign_verify_utils import (
-    _pack_bits_le,
-    _shake_reader,
-    _ml_dsa_ntt,
     _ml_dsa_invntt_tomont,
+    _ml_dsa_ntt,
+    _pack_bits_le,
     _rej_eta,
-    pack_w1,
+    _shake_reader,
     centered_mod_power_of_two,
     mat_vec_add_ahat,
+    pack_w1,
 )
-from src.schemes.ml_kem import ml_kem_keygen, ml_kem_encaps
+from src.schemes.ml_kem import ml_kem_encaps, ml_kem_keygen
 from src.schemes.ml_kem.decaps import ml_kem_decaps
 from src.schemes.ml_kem.keygen import ml_kem_keygen as raw_ml_kem_keygen
 from src.schemes.ml_kem.kyber_ntt import (
-    ntt,
     invntt_tomont,
+    ntt,
     poly_add,
     poly_basemul_montgomery,
     poly_reduce,
     poly_tomont,
 )
+from src.schemes.ml_kem.kyber_pke import kyber_pke_keygen
 from src.schemes.ml_kem.kyber_sampling import sample_cbd_poly
 from src.schemes.ml_kem.pke_utils import (
     encode_polyvec_12,
     encode_public_key_bytes,
     pack_bits_le,
 )
-from src.schemes.ml_kem.kyber_pke import kyber_pke_keygen
 
 
-class TestAnalysisResidualCoverage(unittest.TestCase):
-    def test_bkz_interpolation_fallback_and_chain_cost(self):
-        self.assertEqual(BKZ_Algorithm._interpolate_cost(999), 1.0)
-        total, chain = BKZ_Algorithm.attack_chain_cost(
-            768, target_block_size=30, start_block_size=20
-        )
-        self.assertGreater(total, 0)
-        self.assertTrue(chain)
-        self.assertIn("cumulative_ops", chain[-1])
-
-    def test_ml_dsa_attack_methods(self):
-        analyzer = ML_DSA_AttackAnalysis()
-        self.assertGreater(analyzer.preimage_attack_on_hash(256).quantum_depth, 0)
-        self.assertIn("status", analyzer.transcript_forgery_analysis())
-        self.assertIn("risk_level", analyzer.batch_verification_risk())
-        self.assertIn("status", analyzer.key_recovery_cost())
-
-        zero = ForgeryResistanceAnalyzer.zero_signature_risk()
-        self.assertEqual(zero["occurrence_probability"], 0.0)
-
-    def test_ml_kem_attack_methods(self):
-        analyzer = ML_KEM_AttackAnalysis()
-        self.assertGreater(analyzer.dictionary_attack(128).quantum_depth, 0)
-        side = analyzer.side_channel_vulnerability_analysis()
-        self.assertIn("timing_attacks", side)
-
-
-class TestMlKemResidualCoverage(unittest.TestCase):
+class TestMlKemBranches(unittest.TestCase):
     def test_keygen_error_branches(self):
         with self.assertRaises(ValueError):
             raw_ml_kem_keygen("ML-KEM-512", aseed=None, zseed=b"z" * 32)
@@ -84,7 +51,6 @@ class TestMlKemResidualCoverage(unittest.TestCase):
         _, c = ml_kem_encaps(ek, params)
 
         dk_payload = serialization.from_bytes(dk)
-        # Keep rho as string but break t payload shape so encode_public_key_bytes fails.
         dk_payload["ek"]["t"] = {"type": "invalid"}
         malformed_dk = serialization.to_bytes(dk_payload)
 
@@ -99,8 +65,6 @@ class TestMlKemResidualCoverage(unittest.TestCase):
         payload_with_flip = serialization.from_bytes(dk)
 
         def mutate_then_return(*_args, **_kwargs):
-            # Mutate after the first ek payload validation so the later
-            # pke_public_payload type check (line 116) is exercised.
             payload_with_flip["ek"]["t"] = "not-a-dict"
             return (b"K" * 32, b"R" * 32)
 
@@ -137,7 +101,7 @@ class TestMlKemResidualCoverage(unittest.TestCase):
         self.assertIsInstance(dk, bytes)
 
 
-class TestKyberResidualCoverage(unittest.TestCase):
+class TestKyberBranches(unittest.TestCase):
     def test_kyber_ntt_length_validation(self):
         with self.assertRaises(ValueError):
             ntt([1, 2, 3])
@@ -158,7 +122,7 @@ class TestKyberResidualCoverage(unittest.TestCase):
             sample_cbd_poly(bad_ring, eta=2, seed=b"S" * 32, nonce=0)
 
 
-class TestPkeUtilsResidualCoverage(unittest.TestCase):
+class TestPkeUtilsBranches(unittest.TestCase):
     def test_pack_bits_and_encode_errors(self):
         with self.assertRaises(ValueError):
             pack_bits_le([1, 2], bits=0)
@@ -168,7 +132,6 @@ class TestPkeUtilsResidualCoverage(unittest.TestCase):
         with self.assertRaises(ValueError):
             encode_polyvec_12([[1, 2, 3]], degree=2)
 
-        # Cover trailing-byte path in pack_bits_le and zero-padding in encode_polyvec_12.
         self.assertEqual(pack_bits_le([1], bits=1), b"\x01")
         encoded = encode_polyvec_12([[1, 2]], degree=4)
         self.assertIsInstance(encoded, bytes)
@@ -220,7 +183,7 @@ class TestPkeUtilsResidualCoverage(unittest.TestCase):
             encode_public_key_bytes("00" * 32, t_payload, "ML-KEM-512")
 
 
-class TestMlDsaResidualCoverage(unittest.TestCase):
+class TestMlDsaBranches(unittest.TestCase):
     def test_sign_runtime_error_path(self):
         _, sk = ml_dsa_keygen("ML-DSA-44", aseed=b"A" * 32)
         with patch(
@@ -235,7 +198,6 @@ class TestMlDsaResidualCoverage(unittest.TestCase):
         with self.assertRaises(ValueError):
             _pack_bits_le([16], 4)
 
-        # Cover trailing partial byte path.
         self.assertEqual(_pack_bits_le([1], 1), b"\x01")
 
         with self.assertRaises(ValueError):
@@ -264,7 +226,6 @@ class TestMlDsaResidualCoverage(unittest.TestCase):
         self.assertEqual(centered_mod_power_of_two(7, 2), -1)
         self.assertEqual(centered_mod_power_of_two(2, 2), 2)
 
-        # q/n mismatch validation in mat_vec_add_ahat.
         with self.assertRaises(ValueError):
             mat_vec_add_ahat([], [], [], q=3329, n=256)
 
@@ -272,14 +233,11 @@ class TestMlDsaResidualCoverage(unittest.TestCase):
         ring = QuotientPolynomialRing(IntegersRing(8380417), 256)
         poly = ring.zero()
 
-        # rows != add_entries length
         with self.assertRaises(ValueError):
             mat_vec_add_ahat([[poly]], [poly], [], q=8380417, n=256)
 
-        # rows == 0 early return
         self.assertEqual(mat_vec_add_ahat([], [], [], q=8380417, n=256), [])
 
-        # matrix row width mismatch with vector length
         with self.assertRaises(ValueError):
             mat_vec_add_ahat([[poly, poly]], [poly], [poly], q=8380417, n=256)
 
