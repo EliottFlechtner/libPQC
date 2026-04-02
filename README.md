@@ -188,11 +188,37 @@ LIBPQC_KAT_MAX_RECORDS=1000 LIBPQC_KAT_REQUIRE_FULL=1 \
 python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py
 ```
 
+Run quick KAT smoke checks (2 records per vector file) with progress + timing:
+
+```bash
+LIBPQC_KAT_MAX_RECORDS=2 LIBPQC_KAT_PROGRESS=1 LIBPQC_KAT_TIMING=1 \
+python3 -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py
+```
+
+Generate a per-vector conformance summary (pass/fail, processed count, elapsed):
+
+```bash
+python3 scripts/conformance_summary.py --max-records 2
+```
+
+Full-vector summary mode:
+
+```bash
+python3 scripts/conformance_summary.py --max-records 1000 --full
+```
+
 Useful runtime controls:
 
 - `LIBPQC_KAT_MAX_RECORDS`: max records to process per vector file
 - `LIBPQC_KAT_REQUIRE_FULL`: enforce processing of every record in each file
 - `LIBPQC_KAT_PROGRESS`: print per-file progress counters
+- `LIBPQC_KAT_TIMING`: print per-file elapsed seconds in completion output
+- `LIBPQC_KAT_VECTOR_FILTER`: optional regex filter for vector file names
+
+CI behavior:
+
+- Pull requests and non-scheduled CI runs execute reduced conformance smoke mode (`LIBPQC_KAT_MAX_RECORDS=2`).
+- Nightly scheduled CI executes strict full-vector conformance (`LIBPQC_KAT_MAX_RECORDS=1000` + `LIBPQC_KAT_REQUIRE_FULL=1`).
 
 For details on conformance helpers, adapter layers, and suggested folder architecture,
 see `tests/conformance/README.md`.
