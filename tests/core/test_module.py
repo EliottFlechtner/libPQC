@@ -215,10 +215,8 @@ class TestModule(unittest.TestCase):
         # a = (93 + 51x + 34x^2 + 54x^3, 27 + 87x + 81x^2 + 6x^3, 112 + 15x + 46x^2 + 122x^3)
         a = M3.element([[93, 51, 34, 54], [27, 87, 81, 6], [112, 15, 46, 122]])
 
-        # TODO
         norm_a = a.inf_norm()
-        self.assertGreaterEqual(norm_a, 0)
-        self.assertLessEqual(norm_a, 68)  # Max symmetric value for Z_137
+        self.assertEqual(norm_a, 56)
 
     def test_inf_norm_vector_operations(self):
         """Test infinity norm after vector operations."""

@@ -164,20 +164,11 @@ class TestMlDsaVerifySimplified(unittest.TestCase):
         sig44 = ml_dsa_sign(msg, sk44)
         sig87 = ml_dsa_sign(msg, sk87)
 
-        # Cross-parameter verification should fail (may raise ValueError or return False)
-        try:
-            result = ml_dsa_verify(msg, sig44, vk87, params="87")
-            self.assertFalse(result)
-        except ValueError:
-            # Expected when rank mismatches
-            pass
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_verify(msg, sig44, vk87, params="87")
 
-        try:
-            result = ml_dsa_verify(msg, sig87, vk44, params="44")
-            self.assertFalse(result)
-        except ValueError:
-            # Expected when rank mismatches
-            pass
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_verify(msg, sig87, vk44, params="44")
 
         # Same-parameter verification should pass
         self.assertTrue(ml_dsa_verify(msg, sig44, vk44, params="44"))
