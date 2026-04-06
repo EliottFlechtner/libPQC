@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from hashlib import sha3_256
 from time import perf_counter
-from typing import Literal
+from typing import Literal, Sequence
 
 from src.schemes.ml_dsa.keygen import ml_dsa_keygen
 from src.schemes.ml_dsa.sign import ml_dsa_sign
@@ -37,6 +37,10 @@ class TlsHandshakeRecord:
     certificate_verify_bytes: int
     finished_bytes: int
     estimated_total_bytes: int
+    flight_count: int
+    transcript_hash_hex: str
+    flight_trace: list[dict[str, object]]
+    semantic_bindings: list[str]
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -53,6 +57,38 @@ def _derive_hybrid_secret(pq_secret: bytes, classical_secret: bytes) -> bytes:
 
 def _seed32(label: str, index: int) -> bytes:
     return sha3_256(f"{label}:{index}".encode("utf-8")).digest()
+
+
+def _append_flight(
+    trace: list[dict[str, object]],
+    transcript_hash: bytes,
+    *,
+    flight_number: int,
+    sender: str,
+    message_type: str,
+    payload: bytes,
+    semantics: Sequence[str],
+) -> bytes:
+    payload_hash = sha3_256(payload).digest()
+    semantics_blob = "|".join(semantics).encode("utf-8")
+    next_hash = sha3_256(
+        transcript_hash
+        + f"{flight_number}:{sender}:{message_type}".encode("utf-8")
+        + semantics_blob
+        + payload_hash
+    ).digest()
+    trace.append(
+        {
+            "flight_number": flight_number,
+            "sender": sender,
+            "message_type": message_type,
+            "payload_bytes": len(payload),
+            "payload_hash_hex": payload_hash.hex(),
+            "transcript_hash_hex": next_hash.hex(),
+            "semantics": list(semantics),
+        }
+    )
+    return next_hash
 
 
 def simulate_post_quantum_tls_handshake(
@@ -73,9 +109,30 @@ def simulate_post_quantum_tls_handshake(
     successes = 0
     failures = 0
     shared_matches = 0
+    first_run_trace: list[dict[str, object]] = []
+    first_run_transcript_hash_hex = ""
+    first_run_flight_count = 0
+    first_run_semantics: list[str] = []
 
     for index in range(runs):
         start = perf_counter()
+        transcript_hash = b""
+        run_trace: list[dict[str, object]] = []
+
+        client_hello = (
+            f"tls13-clienthello|kem={kem_params}|mode={mode}|run={index}".encode(
+                "utf-8"
+            )
+        )
+        transcript_hash = _append_flight(
+            run_trace,
+            transcript_hash,
+            flight_number=1,
+            sender="client",
+            message_type="ClientHello",
+            payload=client_hello,
+            semantics=("supported_groups:kyber", "signature_algorithms:dilithium"),
+        )
 
         ek, dk = ml_kem_keygen(
             kem_params,
@@ -89,6 +146,35 @@ def simulate_post_quantum_tls_handshake(
             message=message,
         )
         server_pq_secret = ml_kem_decaps(ciphertext, dk, params=kem_params)
+
+        server_hello = (
+            f"tls13-serverhello|kem={kem_params}|ciphertext-len={len(ciphertext)}".encode(
+                "utf-8"
+            )
+            + ciphertext
+        )
+        transcript_hash = _append_flight(
+            run_trace,
+            transcript_hash,
+            flight_number=2,
+            sender="server",
+            message_type="ServerHello",
+            payload=server_hello,
+            semantics=("key_share:pq",),
+        )
+
+        encrypted_extensions = f"tls13-encrypted-extensions|alpn=h2|mode={mode}".encode(
+            "utf-8"
+        )
+        transcript_hash = _append_flight(
+            run_trace,
+            transcript_hash,
+            flight_number=3,
+            sender="server",
+            message_type="EncryptedExtensions",
+            payload=encrypted_extensions,
+            semantics=("application_protocol:h2",),
+        )
 
         if mode == "hybrid":
             classical_shared = _derive_classical_shared_secret(
@@ -107,6 +193,16 @@ def simulate_post_quantum_tls_handshake(
                 dsa_params,
                 aseed=_seed32("tls-dsa-aseed", index),
             )
+            certificate_payload = vk + dsa_params.encode("utf-8")
+            transcript_hash = _append_flight(
+                run_trace,
+                transcript_hash,
+                flight_number=4,
+                sender="server",
+                message_type="Certificate",
+                payload=certificate_payload,
+                semantics=("certificate_type:ml-dsa", f"dsa_params:{dsa_params}"),
+            )
             transcript = sha3_256(ciphertext + client_secret).digest()
             signature = ml_dsa_sign(
                 transcript,
@@ -116,6 +212,41 @@ def simulate_post_quantum_tls_handshake(
             )
             authenticated = ml_dsa_verify(transcript, signature, vk, params=dsa_params)
             certificate_verify_bytes = len(vk) + len(signature)
+            transcript_hash = _append_flight(
+                run_trace,
+                transcript_hash,
+                flight_number=5,
+                sender="server",
+                message_type="CertificateVerify",
+                payload=signature,
+                semantics=("signature_context:tls13", "transcript_binding:enabled"),
+            )
+
+        server_finished = sha3_256(
+            b"tls13-server-finished" + transcript_hash + server_secret
+        ).digest()
+        transcript_hash = _append_flight(
+            run_trace,
+            transcript_hash,
+            flight_number=6,
+            sender="server",
+            message_type="Finished",
+            payload=server_finished,
+            semantics=("finished_mac:server",),
+        )
+
+        client_finished = sha3_256(
+            b"tls13-client-finished" + transcript_hash + client_secret
+        ).digest()
+        transcript_hash = _append_flight(
+            run_trace,
+            transcript_hash,
+            flight_number=7,
+            sender="client",
+            message_type="Finished",
+            payload=client_finished,
+            semantics=("finished_mac:client", "key_schedule_bound_to_transcript"),
+        )
 
         match = client_secret == server_secret
         shared_matches += 1 if match else 0
@@ -124,6 +255,17 @@ def simulate_post_quantum_tls_handshake(
         else:
             failures += 1
         durations.append(perf_counter() - start)
+
+        if index == 0:
+            first_run_trace = run_trace
+            first_run_transcript_hash_hex = transcript_hash.hex()
+            first_run_flight_count = len(run_trace)
+            first_run_semantics = [
+                "algorithm_binding:client_hello",
+                "key_share_binding:server_hello",
+                "certificate_binding:ml_dsa",
+                "transcript_binding:finished",
+            ]
 
     record = TlsHandshakeRecord(
         mode=mode,
@@ -144,5 +286,9 @@ def simulate_post_quantum_tls_handshake(
         estimated_total_bytes=(
             1184 + 1088 + len(ciphertext) + certificate_verify_bytes + 64
         ),
+        flight_count=first_run_flight_count,
+        transcript_hash_hex=first_run_transcript_hash_hex,
+        flight_trace=first_run_trace,
+        semantic_bindings=first_run_semantics,
     )
     return record.to_dict()
