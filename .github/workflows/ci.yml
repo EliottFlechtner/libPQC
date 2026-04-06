@@ -70,10 +70,14 @@ jobs:
 
       - name: Run test suite
         run: |
+          # Keep conformance tests out of the regular suite: they run in dedicated
+          # smoke/nightly steps below with explicit KAT settings.
+          TEST_FILES=$(find tests -type f -name 'test_*.py' ! -path 'tests/conformance/*' | sort)
+
           if [ "${{ matrix.python-version }}" = "3.12" ]; then
-            coverage run -m unittest discover -s tests -p 'test_*.py'
+            coverage run -m unittest ${TEST_FILES}
           else
-            python -m unittest discover -s tests -p 'test_*.py'
+            python -m unittest ${TEST_FILES}
           fi
 
       - name: Conformance smoke (reduced records)

@@ -512,7 +512,7 @@ class TestAppCliCoverage(unittest.TestCase):
             sys, "argv", ["cli.py", "--definitely-invalid"]
         ), redirect_stderr(StringIO()):
             with self.assertRaises(SystemExit):
-                runpy.run_path(Path(cli.__file__), run_name="__main__")
+                runpy.run_path(Path(cli.__file__), run_name="__main__")  # type: ignore
 
 
 if __name__ == "__main__":
