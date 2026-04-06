@@ -11,6 +11,9 @@ from src.comms.channels.transports import ChannelDeliveryError, TransportChannel
 from src.comms.entities.participant import Participant
 from src.comms.events.logger import EventLogger
 from src.comms.state.session import HandshakePhase, SessionState
+from src.schemes.ml_dsa.keygen import ml_dsa_keygen
+from src.schemes.ml_dsa.sign import ml_dsa_sign
+from src.schemes.ml_dsa.verify import ml_dsa_verify
 from src.schemes.ml_kem import ml_kem_decaps, ml_kem_encaps, ml_kem_keygen
 
 
@@ -85,6 +88,10 @@ def perform_secure_key_agreement(
     server_aseed: bytes | str | None = None,
     server_zseed: bytes | str | None = None,
     encaps_message: bytes | None = None,
+    authenticate_server: bool = False,
+    dsa_params: str = "ML-DSA-87",
+    server_dsa_aseed: bytes | str | None = None,
+    server_signing_rnd: bytes | str | None = None,
 ) -> HandshakeResult:
     """Run a TLS-like post-quantum two-party key agreement with ML-KEM."""
 
@@ -208,6 +215,60 @@ def perform_secure_key_agreement(
         )
         client_state.shared_key = client_shared_key
         server_state.shared_key = server_shared_key
+
+        if authenticate_server:
+            auth_payload = _transcript_hash(transcript)
+            server_vk, server_sk = ml_dsa_keygen(dsa_params, aseed=server_dsa_aseed)
+            server_signature = ml_dsa_sign(
+                auth_payload,
+                server_sk,
+                params=dsa_params,
+                rnd=server_signing_rnd,
+            )
+            server_auth = {
+                "type": "server_auth",
+                "session_id": session_id,
+                "dsa_params": dsa_params,
+                "verification_key": server_vk.hex(),
+                "signature": server_signature.hex(),
+            }
+            delivered_server_auth = _send_over_channel(
+                channel,
+                server.participant_id,
+                client.participant_id,
+                "server_auth",
+                server_auth,
+            )
+            if delivered_server_auth.get("type") != "server_auth":
+                raise ValueError("invalid server auth message")
+
+            delivered_vk_hex = delivered_server_auth.get("verification_key", "")
+            delivered_sig_hex = delivered_server_auth.get("signature", "")
+            delivered_dsa_params = delivered_server_auth.get("dsa_params", dsa_params)
+            if not isinstance(delivered_vk_hex, str) or not isinstance(
+                delivered_sig_hex, str
+            ):
+                raise ValueError("server authentication payload is malformed")
+
+            verified = ml_dsa_verify(
+                auth_payload,
+                bytes.fromhex(delivered_sig_hex),
+                bytes.fromhex(delivered_vk_hex),
+                params=delivered_dsa_params,
+            )
+            if not verified:
+                raise ValueError("server authentication verification failed")
+
+            transcript.append(_serialize_message(delivered_server_auth))
+            client_state.transition(HandshakePhase.AUTHENTICATED)
+            server_state.transition(HandshakePhase.AUTHENTICATED)
+            logger.record(
+                "state_transition",
+                server.participant_id,
+                server_state.phase.value,
+                "server authenticated with ML-DSA",
+                {"dsa_params": delivered_dsa_params},
+            )
 
         server_transcript_hash = _transcript_hash(transcript)
         server_handshake_secret = _derive_handshake_secret(

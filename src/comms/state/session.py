@@ -10,6 +10,7 @@ class HandshakePhase(Enum):
     CLIENT_HELLO_SENT = "client_hello_sent"
     SERVER_HELLO_SENT = "server_hello_sent"
     CLIENT_KEYSHARE_SENT = "client_keyshare_sent"
+    AUTHENTICATED = "authenticated"
     SERVER_FINISHED_SENT = "server_finished_sent"
     CLIENT_FINISHED_SENT = "client_finished_sent"
     ESTABLISHED = "established"

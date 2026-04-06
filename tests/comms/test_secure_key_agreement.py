@@ -74,6 +74,27 @@ class TestSecureKeyAgreement(unittest.TestCase):
         self.assertIn("protocol_start", event_types)
         self.assertIn("state_transition", event_types)
 
+    def test_secure_key_agreement_with_server_authentication(self):
+        result = perform_secure_key_agreement(
+            channel=PerfectChannel(),
+            params="ML-KEM-768",
+            authenticate_server=True,
+            dsa_params="ML-DSA-65",
+            server_aseed=b"server-seed-32-bytes-material!!!!"[:32],
+            server_zseed=b"z" * 32,
+            server_dsa_aseed=b"server-dsa-seed-material-32-bytes"[:32],
+            server_signing_rnd=b"r" * 32,
+            encaps_message=b"m" * 32,
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.client_state.phase, HandshakePhase.ESTABLISHED)
+        self.assertEqual(result.server_state.phase, HandshakePhase.ESTABLISHED)
+        authenticated_events = [
+            event for event in result.events if event["state"] == "authenticated"
+        ]
+        self.assertTrue(authenticated_events)
+
 
 if __name__ == "__main__":
     unittest.main()

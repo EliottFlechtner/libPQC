@@ -8,7 +8,12 @@ from .channels import (
     TransportChannel,
 )
 from .events import EventLogger, ProtocolEvent
-from .protocols import HandshakeResult, perform_secure_key_agreement
+from .protocols import (
+    HandshakeResult,
+    ProtocolRunSummary,
+    perform_secure_key_agreement,
+    run_key_agreement_batch,
+)
 from .state import HandshakePhase, SessionState
 
 __all__ = [
@@ -17,10 +22,12 @@ __all__ = [
     "EventLogger",
     "HandshakePhase",
     "HandshakeResult",
+    "ProtocolRunSummary",
     "NoisyChannel",
     "PerfectChannel",
     "ProtocolEvent",
     "SessionState",
     "TransportChannel",
     "perform_secure_key_agreement",
+    "run_key_agreement_batch",
 ]

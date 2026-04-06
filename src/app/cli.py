@@ -19,6 +19,7 @@ from demos.ml_dsa_demo import main as run_ml_dsa_demo
 from demos.ml_kem_demo import main as run_ml_kem_demo
 from src.app import performance
 from src.app import interoperability
+from src.comms.protocols import run_key_agreement_batch
 from src.schemes.ml_dsa.keygen import ml_dsa_keygen
 from src.schemes.ml_dsa.sign import ml_dsa_sign
 from src.schemes.ml_dsa.verify import ml_dsa_verify
@@ -465,6 +466,30 @@ def _handle_interop_import(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_comms_key_agreement(args: argparse.Namespace) -> int:
+    encaps_message = None
+    if args.encaps_message_hex is not None:
+        encaps_message = _hex_bytes(args.encaps_message_hex, "encaps-message-hex")
+
+    payload = run_key_agreement_batch(
+        runs=args.runs,
+        channel_name=args.channel,
+        kem_params=args.kem_params,
+        authenticate_server=args.authenticate_server,
+        dsa_params=args.dsa_params,
+        noisy_bit_error_rate=args.noisy_bit_error_rate,
+        seed=args.seed,
+        server_aseed=args.server_aseed,
+        server_zseed=args.server_zseed,
+        server_dsa_aseed=args.server_dsa_aseed,
+        server_signing_rnd=args.server_signing_rnd,
+        encaps_message=encaps_message,
+        include_events=args.include_events,
+    )
+    _print_json({"command": "comms", "protocol": "secure-key-agreement", **payload})
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="libPQC")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -844,6 +869,66 @@ def build_parser() -> argparse.ArgumentParser:
             "--input", type=Path, required=True, help="Input bundle path"
         )
         parser_for_name.set_defaults(handler=_handle_interop_import)
+
+    comms_parser = subparsers.add_parser(
+        "comms", help="Run communication protocol simulations"
+    )
+    comms_subparsers = comms_parser.add_subparsers(dest="comms_command", required=True)
+
+    comms_key_agreement = comms_subparsers.add_parser(
+        "key-agreement", help="Run an ML-KEM secure key agreement simulation"
+    )
+    comms_key_agreement.add_argument(
+        "--channel",
+        default="perfect",
+        choices=["perfect", "noisy", "adversarial"],
+        help="Channel model to simulate",
+    )
+    comms_key_agreement.add_argument(
+        "--kem-params", default="ML-KEM-768", help="ML-KEM parameter preset"
+    )
+    comms_key_agreement.add_argument(
+        "--runs", type=int, default=1, help="Number of handshake runs"
+    )
+    comms_key_agreement.add_argument(
+        "--authenticate-server",
+        action="store_true",
+        help="Enable ML-DSA server authentication",
+    )
+    comms_key_agreement.add_argument(
+        "--dsa-params", default="ML-DSA-87", help="ML-DSA parameter preset"
+    )
+    comms_key_agreement.add_argument(
+        "--noisy-bit-error-rate",
+        type=float,
+        default=0.01,
+        help="Bit error rate used by noisy channel",
+    )
+    comms_key_agreement.add_argument(
+        "--seed", type=int, help="Optional deterministic seed for channel randomness"
+    )
+    comms_key_agreement.add_argument(
+        "--encaps-message-hex",
+        help="Optional deterministic 32-byte ML-KEM message as hex",
+    )
+    comms_key_agreement.add_argument(
+        "--server-aseed", help="Optional deterministic ML-KEM keygen seed"
+    )
+    comms_key_agreement.add_argument(
+        "--server-zseed", help="Optional deterministic ML-KEM fallback seed"
+    )
+    comms_key_agreement.add_argument(
+        "--server-dsa-aseed", help="Optional deterministic ML-DSA keygen seed"
+    )
+    comms_key_agreement.add_argument(
+        "--server-signing-rnd", help="Optional deterministic ML-DSA signing randomness"
+    )
+    comms_key_agreement.add_argument(
+        "--include-events",
+        action="store_true",
+        help="Include per-run protocol event logs in JSON output",
+    )
+    comms_key_agreement.set_defaults(handler=_handle_comms_key_agreement)
 
     return parser
 
