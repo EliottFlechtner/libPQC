@@ -23,6 +23,7 @@ from src.app import performance
 from src.app import interoperability
 from src.experiments import (
     DEFAULT_BUDGET_POWERS,
+    DEFAULT_DOWNGRADE_VARIANTS,
     DEFAULT_HYBRID_MODES,
     DEFAULT_ML_DSA_PARAMS,
     DEFAULT_ML_KEM_PARAMS,
@@ -711,6 +712,7 @@ def _handle_experiment_tls_handshake(args: argparse.Namespace) -> int:
 def _handle_experiment_hybrid_scenarios(args: argparse.Namespace) -> int:
     records = simulate_hybrid_pq_scenarios(
         modes=args.modes,
+        downgrade_variants=args.downgrade_variants,
         kem_params=args.kem_params,
         dsa_params=args.dsa_params,
         iterations=args.iterations,
@@ -743,6 +745,16 @@ def _handle_experiment_performance_regression(args: argparse.Namespace) -> int:
             "report_markdown": render_performance_regression_report(payload),
         }
     )
+    if args.baseline_output is not None:
+        interoperability.dump_document(
+            {"results": payload.get("missing_in_current", [])}, args.baseline_output
+        )
+    if args.current_output is not None:
+        interoperability.dump_document(
+            {"results": payload.get("current_results", [])}, args.current_output
+        )
+    if args.strict and bool(payload.get("has_regression", False)):
+        return 2
     return 0
 
 
@@ -1475,6 +1487,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Scenario modes to include",
     )
     experiment_hybrid.add_argument(
+        "--downgrade-variants",
+        nargs="+",
+        default=list(DEFAULT_DOWNGRADE_VARIANTS),
+        choices=list(DEFAULT_DOWNGRADE_VARIANTS),
+        help="Downgrade attack variants to simulate",
+    )
+    experiment_hybrid.add_argument(
         "--kem-params",
         default="ML-KEM-768",
         help="ML-KEM parameter preset",
@@ -1531,6 +1550,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=0,
         help="Benchmark warmup iterations",
+    )
+    experiment_regression.add_argument(
+        "--strict",
+        action="store_true",
+        help="Return non-zero exit code when regressions are detected",
+    )
+    experiment_regression.add_argument(
+        "--baseline-output",
+        type=Path,
+        help="Optional file path to write baseline-only records from comparison",
+    )
+    experiment_regression.add_argument(
+        "--current-output",
+        type=Path,
+        help="Optional file path to write current benchmark records",
     )
     experiment_regression.set_defaults(
         handler=_handle_experiment_performance_regression
