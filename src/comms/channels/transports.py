@@ -77,3 +77,27 @@ class AdversarialChannel(TransportChannel):
 
         self._last_payload = outgoing
         return outgoing
+
+
+@dataclass
+class ReorderingChannel(TransportChannel):
+    """Channel that returns prior payloads out of order for selected stages."""
+
+    reorder_on_stages: tuple[str, ...] = ()
+
+    name = "reordering"
+
+    def __post_init__(self) -> None:
+        self._buffered_payload: bytes | None = None
+
+    def transmit(self, sender: str, receiver: str, payload: bytes, stage: str) -> bytes:
+        if stage not in self.reorder_on_stages:
+            return payload
+
+        if self._buffered_payload is None:
+            self._buffered_payload = payload
+            return payload
+
+        outgoing = self._buffered_payload
+        self._buffered_payload = payload
+        return outgoing

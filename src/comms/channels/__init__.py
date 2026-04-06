@@ -5,6 +5,7 @@ from .transports import (
     ChannelDeliveryError,
     NoisyChannel,
     PerfectChannel,
+    ReorderingChannel,
     TransportChannel,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "ChannelDeliveryError",
     "NoisyChannel",
     "PerfectChannel",
+    "ReorderingChannel",
     "TransportChannel",
 ]
