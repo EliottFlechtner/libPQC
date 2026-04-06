@@ -23,12 +23,16 @@ from .scenarios.adversary import (
 )
 from .scenarios.hybrid import (
     DEFAULT_DOWNGRADE_VARIANTS,
+    DEFAULT_HYBRID_ATTACK_VARIANTS,
     DEFAULT_HYBRID_MODES,
     HybridScenarioRecord,
     simulate_hybrid_pq_scenarios,
 )
 from .scenarios.tls_handshake import (
+    DEFAULT_TLS_CIPHERSUITE,
+    DEFAULT_TLS_DRAFT,
     DEFAULT_TLS_MODES,
+    TLS_CIPHERSUITE_PROFILES,
     TlsHandshakeRecord,
     simulate_post_quantum_tls_handshake,
 )
@@ -38,14 +42,18 @@ __all__ = [
     "DEFAULT_BLOCK_SIZES",
     "DEFAULT_BUDGET_POWERS",
     "DEFAULT_DOWNGRADE_VARIANTS",
+    "DEFAULT_HYBRID_ATTACK_VARIANTS",
     "DEFAULT_HYBRID_MODES",
     "DEFAULT_ML_DSA_PARAMS",
     "DEFAULT_ML_KEM_PARAMS",
     "DEFAULT_SCHEMES",
+    "DEFAULT_TLS_CIPHERSUITE",
+    "DEFAULT_TLS_DRAFT",
     "DEFAULT_TLS_MODES",
     "HybridScenarioRecord",
     "ParametricBenchmarkRecord",
     "RegressionDelta",
+    "TLS_CIPHERSUITE_PROFILES",
     "TlsHandshakeRecord",
     "render_adversary_budget_report",
     "render_hybrid_scenarios_report",

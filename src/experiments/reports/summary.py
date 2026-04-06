@@ -74,6 +74,9 @@ def render_tls_handshake_report(record: dict[str, object]) -> str:
         f"Shared secret match rate: {float(record['shared_secret_match_rate']):.3f}",
         f"Mean latency (ms): {float(record['mean_seconds']) * 1000.0:.3f}",
         f"Estimated handshake bytes: {record['estimated_total_bytes']}",
+        f"Ciphersuite: {record['ciphersuite']}",
+        f"Draft: {record['draft']}",
+        f"Compatibility: {'ok' if record['compatibility']['compatible'] else 'failed'}",
         f"Flight count: {record['flight_count']}",
         f"Transcript hash: {record['transcript_hash_hex']}",
         "Semantic bindings:",
@@ -86,20 +89,21 @@ def render_tls_handshake_report(record: dict[str, object]) -> str:
 def render_hybrid_scenarios_report(records: Sequence[dict[str, object]]) -> str:
     lines = ["HYBRID PQ SCENARIO SWEEP", "=" * 80, ""]
     lines.append(
-        "| requested | negotiated | attack | detected | success | mean ms | effective bits | downgrade score |"
+        "| requested | negotiated | attack | detected | success | mean ms | effective bits | downgrade score | notes |"
     )
-    lines.append("| --- | --- | --- | --- | --- | ---: | ---: | ---: |")
+    lines.append("| --- | --- | --- | --- | --- | ---: | ---: | ---: | --- |")
     for record in records:
         lines.append(
-            "| {mode} | {negotiated} | {variant} | {detected} | {succeeded} | {mean:.3f} | {effective} | {score:.2f} |".format(
+            "| {mode} | {negotiated} | {variant} | {detected} | {succeeded} | {mean:.3f} | {effective} | {score:.2f} | {notes} |".format(
                 mode=record["mode"],
                 negotiated=record["negotiated_mode"],
-                variant=record["downgrade_variant"],
-                detected="yes" if record["downgrade_detected"] else "no",
-                succeeded="yes" if record["downgrade_succeeded"] else "no",
+                variant=record["attack_variant"],
+                detected="yes" if record["attack_detected"] else "no",
+                succeeded="yes" if record["attack_succeeded"] else "no",
                 mean=float(record["mean_seconds"]) * 1000.0,
                 effective=record["effective_security_bits"],
                 score=float(record["downgrade_resistance_score"]),
+                notes="; ".join(str(note) for note in record.get("attack_notes", [])),
             )
         )
     return "\n".join(lines)
