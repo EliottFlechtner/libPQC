@@ -83,6 +83,70 @@ class TestCli(unittest.TestCase):
         verify_payload = json.loads(verify_output)
         self.assertTrue(verify_payload["verified"])
 
+    def test_benchmark_ml_kem_keygen(self):
+        with patch(
+            "src.app.performance.benchmark_ml_kem_keygen",
+            return_value={"operation": "ml-kem-keygen", "iterations": 2},
+        ) as benchmark_keygen:
+            rc, output = self._run_cli(
+                ["benchmark", "ml-kem", "keygen", "--iterations", "2"]
+            )
+
+        self.assertEqual(rc, 0)
+        benchmark_keygen.assert_called_once_with(
+            params="ML-KEM-768", iterations=2, warmup_iterations=1
+        )
+        payload = json.loads(output)
+        self.assertEqual(payload["command"], "benchmark")
+        self.assertEqual(payload["operation"], "ml-kem-keygen")
+
+    def test_profile_ml_dsa_sign(self):
+        with patch(
+            "src.app.performance.profile_ml_dsa_sign",
+            return_value={"operation": "ml-dsa-sign", "top_functions": []},
+        ) as profile_sign:
+            rc, output = self._run_cli(
+                ["profile", "ml-dsa", "sign", "--iterations", "1"]
+            )
+
+        self.assertEqual(rc, 0)
+        profile_sign.assert_called_once_with(
+            params="ML-DSA-87",
+            iterations=1,
+            warmup_iterations=0,
+            limit=25,
+            sort_by="cumtime",
+        )
+        payload = json.loads(output)
+        self.assertEqual(payload["command"], "profile")
+        self.assertEqual(payload["operation"], "ml-dsa-sign")
+
+    def test_benchmark_core_poly_mul(self):
+        with patch(
+            "src.app.performance.benchmark_polynomial_multiplication",
+            return_value={"operation": "polynomial-multiplication", "iterations": 3},
+        ) as benchmark_poly:
+            rc, output = self._run_cli(
+                [
+                    "benchmark",
+                    "core",
+                    "poly-mul",
+                    "--modulus",
+                    "3329",
+                    "--degree",
+                    "256",
+                    "--iterations",
+                    "3",
+                ]
+            )
+
+        self.assertEqual(rc, 0)
+        benchmark_poly.assert_called_once_with(
+            modulus=3329, degree=256, iterations=3, warmup_iterations=1
+        )
+        payload = json.loads(output)
+        self.assertEqual(payload["operation"], "polynomial-multiplication")
+
 
 if __name__ == "__main__":
     unittest.main()
