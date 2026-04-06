@@ -74,23 +74,30 @@ def render_tls_handshake_report(record: dict[str, object]) -> str:
         f"Shared secret match rate: {float(record['shared_secret_match_rate']):.3f}",
         f"Mean latency (ms): {float(record['mean_seconds']) * 1000.0:.3f}",
         f"Estimated handshake bytes: {record['estimated_total_bytes']}",
+        f"Flight count: {record['flight_count']}",
+        f"Transcript hash: {record['transcript_hash_hex']}",
+        "Semantic bindings:",
     ]
+    for binding in record["semantic_bindings"]:
+        lines.append(f"- {binding}")
     return "\n".join(lines)
 
 
 def render_hybrid_scenarios_report(records: Sequence[dict[str, object]]) -> str:
     lines = ["HYBRID PQ SCENARIO SWEEP", "=" * 80, ""]
     lines.append(
-        "| mode | mean ms | classical bits | pq bits | effective bits | downgrade score |"
+        "| requested | negotiated | attack | detected | success | mean ms | effective bits | downgrade score |"
     )
-    lines.append("| --- | ---: | ---: | ---: | ---: | ---: |")
+    lines.append("| --- | --- | --- | --- | --- | ---: | ---: | ---: |")
     for record in records:
         lines.append(
-            "| {mode} | {mean:.3f} | {classical} | {pq} | {effective} | {score:.2f} |".format(
+            "| {mode} | {negotiated} | {variant} | {detected} | {succeeded} | {mean:.3f} | {effective} | {score:.2f} |".format(
                 mode=record["mode"],
+                negotiated=record["negotiated_mode"],
+                variant=record["downgrade_variant"],
+                detected="yes" if record["downgrade_detected"] else "no",
+                succeeded="yes" if record["downgrade_succeeded"] else "no",
                 mean=float(record["mean_seconds"]) * 1000.0,
-                classical=record["classical_security_bits"],
-                pq=record["pq_security_bits"],
                 effective=record["effective_security_bits"],
                 score=float(record["downgrade_resistance_score"]),
             )
@@ -105,6 +112,8 @@ def render_performance_regression_report(payload: dict[str, object]) -> str:
         f"Threshold ratio: {float(payload['threshold_ratio']):.3f}",
         f"Comparisons: {payload['comparison_count']}",
         f"Regressions: {payload['regression_count']}",
+        f"Missing entries: {len(payload['missing_in_current'])}",
+        f"New entries: {len(payload['new_in_current'])}",
         "",
         "| family | operation | params | baseline ms | current ms | slowdown | regression |",
         "| --- | --- | --- | ---: | ---: | ---: | --- |",

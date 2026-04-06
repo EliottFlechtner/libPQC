@@ -22,6 +22,7 @@ from .scenarios.adversary import (
     simulate_lattice_attack_budgets,
 )
 from .scenarios.hybrid import (
+    DEFAULT_DOWNGRADE_VARIANTS,
     DEFAULT_HYBRID_MODES,
     HybridScenarioRecord,
     simulate_hybrid_pq_scenarios,
@@ -36,6 +37,7 @@ __all__ = [
     "BudgetFrontierRecord",
     "DEFAULT_BLOCK_SIZES",
     "DEFAULT_BUDGET_POWERS",
+    "DEFAULT_DOWNGRADE_VARIANTS",
     "DEFAULT_HYBRID_MODES",
     "DEFAULT_ML_DSA_PARAMS",
     "DEFAULT_ML_KEM_PARAMS",
