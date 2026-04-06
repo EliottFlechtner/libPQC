@@ -48,7 +48,7 @@ def _derive_member_seed(
             seed_prefix + b"|" + member_id.encode("utf-8")
         ).digest()
         return digest[:32]
-    digest = hashlib.sha3_256((seed_prefix + "|" + member_id).encode("utf-8")).digest()
+    digest = hashlib.sha3_256(f"{seed_prefix}|{member_id}".encode("utf-8")).digest()
     return digest[:32]
 
 
