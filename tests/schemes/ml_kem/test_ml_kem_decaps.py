@@ -90,6 +90,21 @@ class TestMlKemDecaps(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = ml_kem_decaps(ciphertext, to_bytes(bad_ek), "ML-KEM-768")
 
+    def test_decaps_rejects_malformed_hex_fields(self):
+        ek, dk = ml_kem_keygen("ML-KEM-768", aseed=b"decaps-bad-hex")
+        _, ciphertext = ml_kem_encaps(ek, "ML-KEM-768", message=b"l" * 32)
+        dk_obj = from_bytes(dk)
+
+        bad_z = dict(dk_obj)
+        bad_z["z"] = "zz"
+        with self.assertRaises(ValueError):
+            _ = ml_kem_decaps(ciphertext, to_bytes(bad_z), "ML-KEM-768")
+
+        bad_h = dict(dk_obj)
+        bad_h["h_ek"] = "gg"
+        with self.assertRaises(ValueError):
+            _ = ml_kem_decaps(ciphertext, to_bytes(bad_h), "ML-KEM-768")
+
     def test_decaps_malformed_ek_hits_explicit_branch(self):
         ek, dk = ml_kem_keygen("ML-KEM-768", aseed=b"decaps-ek-branch")
         _, ciphertext = ml_kem_encaps(ek, "ML-KEM-768", message=b"j" * 32)
@@ -124,6 +139,12 @@ class TestMlKemDecaps(unittest.TestCase):
         ):
             recovered = ml_kem_decaps(ciphertext, dk, "ML-KEM-768")
             self.assertEqual(recovered, expected_fallback)
+
+    def test_decaps_cross_parameter_rejection(self):
+        ek_512, dk_512 = ml_kem_keygen("ML-KEM-512", aseed=b"decaps-cross")
+        shared_512, ciphertext = ml_kem_encaps(ek_512, "ML-KEM-512", message=b"c" * 32)
+        recovered_wrong_params = ml_kem_decaps(ciphertext, dk_512, "ML-KEM-1024")
+        self.assertNotEqual(recovered_wrong_params, shared_512)
 
 
 if __name__ == "__main__":

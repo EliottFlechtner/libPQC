@@ -260,6 +260,22 @@ class TestMlDsaSignSimplified(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     _ = ml_dsa_sign("msg", serialization.to_bytes(bad))
 
+    def test_sign_rejects_malformed_hex_fields(self):
+        _, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"sign-bad-hex")
+        sk_obj = serialization.from_bytes(sk)
+
+        for field in ["rho", "K", "tr"]:
+            with self.subTest(field=field):
+                bad = dict(sk_obj)
+                bad[field] = "not-hex"
+                with self.assertRaises(ValueError):
+                    _ = ml_dsa_sign("msg", serialization.to_bytes(bad))
+
+    def test_sign_cross_parameter_rejection(self):
+        _, sk44 = ml_dsa_keygen("ML-DSA-44", aseed=b"sign-cross")
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_sign("msg", sk44, params="ML-DSA-87")
+
     def test_sign_rejects_matrix_dimension_mismatch(self):
         _, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"sign-a-shape")
 

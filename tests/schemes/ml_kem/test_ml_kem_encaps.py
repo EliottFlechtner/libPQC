@@ -85,6 +85,19 @@ class TestMlKemEncaps(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = ml_kem_encaps(to_bytes(bad_t), "ML-KEM-768", message=b"m" * 32)
 
+    def test_encaps_rejects_malformed_rho_hex(self):
+        ek, _ = ml_kem_keygen("ML-KEM-768", aseed=b"k" * 32)
+        ek_obj = from_bytes(ek)
+        bad = dict(ek_obj)
+        bad["rho"] = "not-hex"
+        with self.assertRaises(ValueError):
+            _ = ml_kem_encaps(to_bytes(bad), "ML-KEM-768", message=b"m" * 32)
+
+    def test_encaps_cross_parameter_rejection(self):
+        ek_512, _ = ml_kem_keygen("ML-KEM-512", aseed=b"k" * 32)
+        with self.assertRaises(ValueError):
+            _ = ml_kem_encaps(ek_512, "ML-KEM-1024", message=b"m" * 32)
+
 
 if __name__ == "__main__":
     unittest.main()
