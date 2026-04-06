@@ -21,6 +21,24 @@ from demos.ml_dsa_demo import main as run_ml_dsa_demo
 from demos.ml_kem_demo import main as run_ml_kem_demo
 from src.app import performance
 from src.app import interoperability
+from src.experiments import (
+    DEFAULT_BUDGET_POWERS,
+    DEFAULT_HYBRID_MODES,
+    DEFAULT_ML_DSA_PARAMS,
+    DEFAULT_ML_KEM_PARAMS,
+    DEFAULT_SCHEMES,
+    DEFAULT_TLS_MODES,
+    render_adversary_budget_report,
+    render_hybrid_scenarios_report,
+    render_parametric_benchmark_report,
+    render_performance_regression_report,
+    render_tls_handshake_report,
+    run_parametric_benchmark_sweep,
+    simulate_hybrid_pq_scenarios,
+    simulate_post_quantum_tls_handshake,
+    simulate_lattice_attack_budgets,
+    track_performance_regressions,
+)
 from src.comms.protocols import (
     broadcast_group_message,
     export_group_transcript,
@@ -632,6 +650,97 @@ def _handle_comms_group_rekey(args: argparse.Namespace) -> int:
                     for member_key in rekeyed.rekeyed_result.member_group_keys.values()
                 )
             ),
+        }
+    )
+    return 0
+
+
+def _handle_experiment_parametric_benchmarks(args: argparse.Namespace) -> int:
+    records = run_parametric_benchmark_sweep(
+        kem_params=args.kem_params,
+        dsa_params=args.dsa_params,
+        iterations=args.iterations,
+        warmup_iterations=args.warmup,
+    )
+    _print_json(
+        {
+            "command": "experiment",
+            "scenario": "parametric-benchmarks",
+            "results": records,
+            "report_markdown": render_parametric_benchmark_report(records),
+        }
+    )
+    return 0
+
+
+def _handle_experiment_adversary_simulations(args: argparse.Namespace) -> int:
+    records = simulate_lattice_attack_budgets(
+        budgets_pow=args.budget_exp,
+        schemes=args.schemes,
+    )
+    _print_json(
+        {
+            "command": "experiment",
+            "scenario": "adversary-simulations",
+            "results": records,
+            "report_markdown": render_adversary_budget_report(records),
+        }
+    )
+    return 0
+
+
+def _handle_experiment_tls_handshake(args: argparse.Namespace) -> int:
+    record = simulate_post_quantum_tls_handshake(
+        mode=args.mode,
+        kem_params=args.kem_params,
+        dsa_params=args.dsa_params,
+        runs=args.runs,
+        authenticate_server=args.authenticate_server,
+    )
+    _print_json(
+        {
+            "command": "experiment",
+            "scenario": "pq-tls-handshake",
+            "result": record,
+            "report_markdown": render_tls_handshake_report(record),
+        }
+    )
+    return 0
+
+
+def _handle_experiment_hybrid_scenarios(args: argparse.Namespace) -> int:
+    records = simulate_hybrid_pq_scenarios(
+        modes=args.modes,
+        kem_params=args.kem_params,
+        dsa_params=args.dsa_params,
+        iterations=args.iterations,
+    )
+    _print_json(
+        {
+            "command": "experiment",
+            "scenario": "hybrid-scenarios",
+            "results": records,
+            "report_markdown": render_hybrid_scenarios_report(records),
+        }
+    )
+    return 0
+
+
+def _handle_experiment_performance_regression(args: argparse.Namespace) -> int:
+    payload = track_performance_regressions(
+        baseline_source=args.baseline,
+        threshold_ratio=args.threshold_ratio,
+        kem_params=args.kem_params,
+        dsa_params=args.dsa_params,
+        iterations=args.iterations,
+        warmup_iterations=args.warmup,
+    )
+    _print_json(
+        {
+            "command": "experiment",
+            "scenario": "performance-regression",
+            **payload,
+            "report_markdown": render_performance_regression_report(payload),
         }
     )
     return 0
@@ -1270,6 +1379,162 @@ def build_parser() -> argparse.ArgumentParser:
         help="Remove a member identifier from the next group session",
     )
     comms_group_rekey.set_defaults(handler=_handle_comms_group_rekey)
+
+    experiment_parser = subparsers.add_parser(
+        "experiment", help="Run experiment sweeps and adversary simulations"
+    )
+    experiment_subparsers = experiment_parser.add_subparsers(
+        dest="experiment_command", required=True
+    )
+
+    experiment_parametric = experiment_subparsers.add_parser(
+        "parametric-benchmarks",
+        help="Sweep ML-KEM and ML-DSA benchmarks across parameter presets",
+    )
+    experiment_parametric.add_argument(
+        "--kem-params",
+        nargs="+",
+        default=list(DEFAULT_ML_KEM_PARAMS),
+        help="ML-KEM parameter presets to benchmark",
+    )
+    experiment_parametric.add_argument(
+        "--dsa-params",
+        nargs="+",
+        default=list(DEFAULT_ML_DSA_PARAMS),
+        help="ML-DSA parameter presets to benchmark",
+    )
+    experiment_parametric.add_argument(
+        "--iterations", type=int, default=performance.DEFAULT_ITERATIONS
+    )
+    experiment_parametric.add_argument(
+        "--warmup", type=int, default=performance.DEFAULT_WARMUP
+    )
+    experiment_parametric.set_defaults(handler=_handle_experiment_parametric_benchmarks)
+
+    experiment_adversary = experiment_subparsers.add_parser(
+        "adversary-simulations",
+        help="Simulate lattice attacks under varying computational budgets",
+    )
+    experiment_adversary.add_argument(
+        "--schemes",
+        nargs="+",
+        default=list(DEFAULT_SCHEMES),
+        help="Scheme identifiers to include in the sweep",
+    )
+    experiment_adversary.add_argument(
+        "--budget-exp",
+        nargs="+",
+        type=int,
+        default=list(DEFAULT_BUDGET_POWERS),
+        help="Budget exponents; each budget is 2^n bit operations",
+    )
+    experiment_adversary.set_defaults(handler=_handle_experiment_adversary_simulations)
+
+    experiment_tls = experiment_subparsers.add_parser(
+        "pq-tls-handshake",
+        help="Simulate a TLS-style post-quantum or hybrid key exchange handshake",
+    )
+    experiment_tls.add_argument(
+        "--mode",
+        default="pq-only",
+        choices=list(DEFAULT_TLS_MODES),
+        help="Handshake key schedule mode",
+    )
+    experiment_tls.add_argument(
+        "--kem-params",
+        default="ML-KEM-768",
+        help="ML-KEM parameter preset",
+    )
+    experiment_tls.add_argument(
+        "--dsa-params",
+        default="ML-DSA-87",
+        help="ML-DSA parameter preset",
+    )
+    experiment_tls.add_argument(
+        "--runs",
+        type=int,
+        default=1,
+        help="Number of handshake runs",
+    )
+    experiment_tls.add_argument(
+        "--authenticate-server",
+        action="store_true",
+        help="Enable ML-DSA certificate verify stage",
+    )
+    experiment_tls.set_defaults(handler=_handle_experiment_tls_handshake)
+
+    experiment_hybrid = experiment_subparsers.add_parser(
+        "hybrid-scenarios",
+        help="Compare classical-only, PQ-only, and hybrid handshake scenarios",
+    )
+    experiment_hybrid.add_argument(
+        "--modes",
+        nargs="+",
+        default=list(DEFAULT_HYBRID_MODES),
+        choices=list(DEFAULT_HYBRID_MODES),
+        help="Scenario modes to include",
+    )
+    experiment_hybrid.add_argument(
+        "--kem-params",
+        default="ML-KEM-768",
+        help="ML-KEM parameter preset",
+    )
+    experiment_hybrid.add_argument(
+        "--dsa-params",
+        default="ML-DSA-87",
+        help="ML-DSA parameter preset",
+    )
+    experiment_hybrid.add_argument(
+        "--iterations",
+        type=int,
+        default=1,
+        help="Iterations per mode",
+    )
+    experiment_hybrid.set_defaults(handler=_handle_experiment_hybrid_scenarios)
+
+    experiment_regression = experiment_subparsers.add_parser(
+        "performance-regression",
+        help="Track benchmark regressions against a baseline document",
+    )
+    experiment_regression.add_argument(
+        "--baseline",
+        type=Path,
+        required=True,
+        help="Baseline experiment JSON file (use experiment parametric-benchmarks output)",
+    )
+    experiment_regression.add_argument(
+        "--threshold-ratio",
+        type=float,
+        default=1.15,
+        help="Slowdown ratio considered a regression",
+    )
+    experiment_regression.add_argument(
+        "--kem-params",
+        nargs="+",
+        default=list(DEFAULT_ML_KEM_PARAMS),
+        help="ML-KEM parameter presets to benchmark",
+    )
+    experiment_regression.add_argument(
+        "--dsa-params",
+        nargs="+",
+        default=list(DEFAULT_ML_DSA_PARAMS),
+        help="ML-DSA parameter presets to benchmark",
+    )
+    experiment_regression.add_argument(
+        "--iterations",
+        type=int,
+        default=1,
+        help="Benchmark iterations",
+    )
+    experiment_regression.add_argument(
+        "--warmup",
+        type=int,
+        default=0,
+        help="Benchmark warmup iterations",
+    )
+    experiment_regression.set_defaults(
+        handler=_handle_experiment_performance_regression
+    )
 
     return parser
 

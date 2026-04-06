@@ -1,0 +1,124 @@
+"""Report helpers for experiment outputs."""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from typing import Sequence
+
+
+def render_parametric_benchmark_report(records: Sequence[dict[str, object]]) -> str:
+    lines = ["PARAMETRIC BENCHMARK SWEEP", "=" * 80, ""]
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
+    for record in records:
+        grouped[(str(record["family"]), str(record["operation"]))].append(record)
+
+    for (family, operation), items in grouped.items():
+        lines.append(f"{family.upper()} / {operation}")
+        lines.append("-" * 80)
+        lines.append("| params | mean ms | baseline | slowdown | throughput ops/s |")
+        lines.append("| --- | ---: | ---: | ---: | ---: |")
+        for item in items:
+            lines.append(
+                "| {params} | {mean:.3f} | {baseline:.3f} | {slowdown:.3f} | {throughput:.2f} |".format(
+                    params=item["params"],
+                    mean=float(item["mean_seconds"]) * 1000.0,
+                    baseline=float(item["baseline_mean_seconds"]) * 1000.0,
+                    slowdown=float(item["relative_slowdown"]),
+                    throughput=float(item["throughput_ops_per_second"]),
+                )
+            )
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
+
+
+def render_adversary_budget_report(records: Sequence[dict[str, object]]) -> str:
+    lines = ["LATTICE ADVERSARY BUDGET SWEEP", "=" * 80, ""]
+    grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for record in records:
+        grouped[str(record["scheme"])].append(record)
+
+    for scheme, items in grouped.items():
+        lines.append(scheme.upper())
+        lines.append("-" * 80)
+        lines.append("| budget 2^n | LLL | BKZ-200 | max affordable BKZ block |")
+        lines.append("| --- | --- | --- | ---: |")
+        for item in items:
+            lines.append(
+                "| 2^{power} | {lll} | {bkz} | {block} |".format(
+                    power=item["budget_power"],
+                    lll="yes" if item["lll_affordable"] else "no",
+                    bkz="yes" if item["bkz_200_affordable"] else "no",
+                    block=(
+                        item["max_affordable_block_size"]
+                        if item["max_affordable_block_size"] is not None
+                        else "-"
+                    ),
+                )
+            )
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
+
+
+def render_tls_handshake_report(record: dict[str, object]) -> str:
+    lines = [
+        "POST-QUANTUM TLS HANDSHAKE",
+        "=" * 80,
+        f"Mode: {record['mode']}",
+        f"KEM: {record['kem_params']}",
+        f"DSA: {record['dsa_params']}",
+        f"Runs: {record['runs']}",
+        f"Successes: {record['handshake_successes']}",
+        f"Failures: {record['handshake_failures']}",
+        f"Shared secret match rate: {float(record['shared_secret_match_rate']):.3f}",
+        f"Mean latency (ms): {float(record['mean_seconds']) * 1000.0:.3f}",
+        f"Estimated handshake bytes: {record['estimated_total_bytes']}",
+    ]
+    return "\n".join(lines)
+
+
+def render_hybrid_scenarios_report(records: Sequence[dict[str, object]]) -> str:
+    lines = ["HYBRID PQ SCENARIO SWEEP", "=" * 80, ""]
+    lines.append(
+        "| mode | mean ms | classical bits | pq bits | effective bits | downgrade score |"
+    )
+    lines.append("| --- | ---: | ---: | ---: | ---: | ---: |")
+    for record in records:
+        lines.append(
+            "| {mode} | {mean:.3f} | {classical} | {pq} | {effective} | {score:.2f} |".format(
+                mode=record["mode"],
+                mean=float(record["mean_seconds"]) * 1000.0,
+                classical=record["classical_security_bits"],
+                pq=record["pq_security_bits"],
+                effective=record["effective_security_bits"],
+                score=float(record["downgrade_resistance_score"]),
+            )
+        )
+    return "\n".join(lines)
+
+
+def render_performance_regression_report(payload: dict[str, object]) -> str:
+    lines = [
+        "PERFORMANCE REGRESSION TRACKING",
+        "=" * 80,
+        f"Threshold ratio: {float(payload['threshold_ratio']):.3f}",
+        f"Comparisons: {payload['comparison_count']}",
+        f"Regressions: {payload['regression_count']}",
+        "",
+        "| family | operation | params | baseline ms | current ms | slowdown | regression |",
+        "| --- | --- | --- | ---: | ---: | ---: | --- |",
+    ]
+    for delta in payload["deltas"]:
+        lines.append(
+            "| {family} | {operation} | {params} | {baseline:.3f} | {current:.3f} | {ratio:.3f} | {regression} |".format(
+                family=delta["family"],
+                operation=delta["operation"],
+                params=delta["params"],
+                baseline=float(delta["baseline_mean_seconds"]) * 1000.0,
+                current=float(delta["current_mean_seconds"]) * 1000.0,
+                ratio=float(delta["slowdown_ratio"]),
+                regression="yes" if delta["regression"] else "no",
+            )
+        )
+    return "\n".join(lines)
