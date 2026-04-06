@@ -177,9 +177,6 @@ jobs:
       - name: Stage coverage files
         run: |
           mkdir -p coverage
-          rm -rf coverage/html
-          mkdir -p coverage/html
-          cp -r coverage_artifact/htmlcov/. coverage/html/
           cp coverage_artifact/coverage.xml coverage/coverage.xml
           cp coverage_artifact/coverage.json coverage/coverage.json
 
@@ -191,9 +188,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Force-add because repository/global ignore rules and coverage.py's
-          # generated coverage/html/.gitignore can otherwise block report files.
-          git add -A -f coverage
+          git add -A coverage
           if git diff --cached --quiet; then
             echo "No coverage changes to commit"
             exit 0

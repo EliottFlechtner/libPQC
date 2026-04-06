@@ -32,7 +32,6 @@ def main() -> None:
     coverage_json = Path("coverage/coverage.json")
     badge_svg = Path("coverage/badge.svg")
     summary_md = Path("coverage/summary.md")
-    index_html = Path("coverage/index.html")
 
     data = json.loads(coverage_json.read_text())
     pct = round(float(data["totals"]["percent_covered"]), 2)
@@ -47,21 +46,7 @@ def main() -> None:
         "## Files\n\n"
         "- `coverage/coverage.xml`\n"
         "- `coverage/coverage.json`\n"
-        "- `coverage/html/index.html`\n"
-    )
-
-    index_html.write_text(
-        "<!doctype html>\n"
-        "<html>\n"
-        "  <head>\n"
-        '    <meta charset="utf-8" />\n'
-        '    <meta http-equiv="refresh" content="0; url=./html/index.html" />\n'
-        "    <title>Coverage Report</title>\n"
-        "  </head>\n"
-        "  <body>\n"
-        '    <p>Coverage report: <a href="./html/index.html">open</a></p>\n'
-        "  </body>\n"
-        "</html>\n"
+        "- HTML report is generated as a CI artifact or locally via `coverage html`\n"
     )
 
 

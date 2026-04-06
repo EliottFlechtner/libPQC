@@ -311,8 +311,11 @@ python3 scripts/update_coverage_assets.py
 Useful outputs:
 
 - `coverage/summary.md`
-- `coverage/html/index.html`
 - `coverage/badge.svg`
+
+Notes:
+
+- HTML coverage output is generated locally (`coverage html -d coverage/html`) or available as a CI artifact, and is not committed to the repository.
 
 ## Release Process
 
