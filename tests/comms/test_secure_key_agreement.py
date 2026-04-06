@@ -6,7 +6,7 @@ from src.comms.channels.transports import (
     PerfectChannel,
 )
 from src.comms.protocols.secure_key_agreement import perform_secure_key_agreement
-from src.comms.state.session import HandshakePhase
+from src.comms.state.session import HandshakePhase, ProtocolState
 
 
 class TestSecureKeyAgreement(unittest.TestCase):
@@ -22,6 +22,8 @@ class TestSecureKeyAgreement(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.client_state.phase, HandshakePhase.ESTABLISHED)
         self.assertEqual(result.server_state.phase, HandshakePhase.ESTABLISHED)
+        self.assertEqual(result.client_state.protocol_state, ProtocolState.ACTIVE)
+        self.assertEqual(result.server_state.protocol_state, ProtocolState.ACTIVE)
         self.assertIsNotNone(result.client_application_key)
         self.assertEqual(result.client_application_key, result.server_application_key)
 
@@ -37,6 +39,8 @@ class TestSecureKeyAgreement(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertEqual(result.client_state.phase, HandshakePhase.FAILED)
         self.assertEqual(result.server_state.phase, HandshakePhase.FAILED)
+        self.assertEqual(result.client_state.protocol_state, ProtocolState.FAILED)
+        self.assertEqual(result.server_state.protocol_state, ProtocolState.FAILED)
 
     def test_secure_key_agreement_fails_on_adversarial_tamper(self):
         def tamper_keyshare(
@@ -58,6 +62,7 @@ class TestSecureKeyAgreement(unittest.TestCase):
 
         self.assertFalse(result.success)
         self.assertIn("failed", result.client_state.phase.value)
+        self.assertEqual(result.client_state.protocol_state, ProtocolState.FAILED)
 
     def test_event_log_tracks_state_transitions(self):
         result = perform_secure_key_agreement(
@@ -90,6 +95,8 @@ class TestSecureKeyAgreement(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.client_state.phase, HandshakePhase.ESTABLISHED)
         self.assertEqual(result.server_state.phase, HandshakePhase.ESTABLISHED)
+        self.assertEqual(result.client_state.protocol_state, ProtocolState.ACTIVE)
+        self.assertEqual(result.server_state.protocol_state, ProtocolState.ACTIVE)
         authenticated_events = [
             event for event in result.events if event["state"] == "authenticated"
         ]

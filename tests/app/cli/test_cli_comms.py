@@ -45,6 +45,8 @@ class TestCliComms(unittest.TestCase):
         self.assertEqual(payload["successes"], 1)
         self.assertEqual(payload["failures"], 0)
         self.assertTrue(payload["results"][0]["application_keys_match"])
+        self.assertEqual(payload["results"][0]["client_protocol_state"], "active")
+        self.assertEqual(payload["results"][0]["server_protocol_state"], "active")
 
     def test_comms_key_agreement_adversarial_fails(self):
         rc, output = self._run_cli(
@@ -68,6 +70,8 @@ class TestCliComms(unittest.TestCase):
         payload = json.loads(output)
         self.assertEqual(payload["successes"], 0)
         self.assertEqual(payload["failures"], 1)
+        self.assertEqual(payload["results"][0]["client_protocol_state"], "failed")
+        self.assertEqual(payload["results"][0]["server_protocol_state"], "failed")
 
 
 if __name__ == "__main__":

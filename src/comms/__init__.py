@@ -14,7 +14,7 @@ from .protocols import (
     perform_secure_key_agreement,
     run_key_agreement_batch,
 )
-from .state import HandshakePhase, SessionState
+from .state import HandshakePhase, ProtocolState, SessionState
 
 __all__ = [
     "AdversarialChannel",
@@ -22,6 +22,7 @@ __all__ = [
     "EventLogger",
     "HandshakePhase",
     "HandshakeResult",
+    "ProtocolState",
     "ProtocolRunSummary",
     "NoisyChannel",
     "PerfectChannel",

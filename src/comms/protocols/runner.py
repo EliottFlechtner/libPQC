@@ -43,6 +43,8 @@ class ProtocolRunSummary:
     authenticate_server: bool
     client_phase: str
     server_phase: str
+    client_protocol_state: str
+    server_protocol_state: str
     application_keys_match: bool
     error: str | None
     events: List[Dict[str, Any]]
@@ -99,6 +101,8 @@ def run_key_agreement_batch(
                 authenticate_server=authenticate_server,
                 client_phase=result.client_state.phase.value,
                 server_phase=result.server_state.phase.value,
+                client_protocol_state=result.client_state.protocol_state.value,
+                server_protocol_state=result.server_state.protocol_state.value,
                 application_keys_match=(
                     result.client_application_key is not None
                     and result.server_application_key is not None
@@ -130,6 +134,8 @@ def run_key_agreement_batch(
                 "authenticate_server": summary.authenticate_server,
                 "client_phase": summary.client_phase,
                 "server_phase": summary.server_phase,
+                "client_protocol_state": summary.client_protocol_state,
+                "server_protocol_state": summary.server_protocol_state,
                 "application_keys_match": summary.application_keys_match,
                 "error": summary.error,
                 "events": summary.events,
