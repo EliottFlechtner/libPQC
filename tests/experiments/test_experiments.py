@@ -168,6 +168,9 @@ class TestTlsAndHybridExperiments(unittest.TestCase):
         self.assertIn("transcript_hash_hex", result)
         self.assertIn("flight_trace", result)
         self.assertIn("semantic_bindings", result)
+        self.assertIn("ciphersuite", result)
+        self.assertIn("draft", result)
+        self.assertIn("compatibility", result)
 
         report = render_tls_handshake_report(result)
         self.assertIn("POST-QUANTUM TLS HANDSHAKE", report)
@@ -192,20 +195,35 @@ class TestTlsAndHybridExperiments(unittest.TestCase):
             "certificate_verify_bytes": 1,
             "finished_bytes": 1,
             "estimated_total_bytes": 4,
+            "ciphersuite": "TLS13-IETF-PQT-MLKEM768-MLDSA87-SHA384",
+            "draft": "ietf-pqtls-00",
+            "compatibility": {
+                "compatible": True,
+                "issues": [],
+                "warnings": [],
+                "known_ciphersuite": True,
+                "profile": {},
+            },
+            "flight_count": 7,
+            "transcript_hash_hex": "00" * 32,
+            "flight_trace": [],
+            "semantic_bindings": ["transcript_binding:finished"],
         }
 
         records = simulate_hybrid_pq_scenarios(
             modes=("classical-only", "pq-only", "hybrid"),
-            downgrade_variants=("none",),
+            downgrade_variants=("none", "mitm-transcript-mutation"),
             iterations=1,
         )
 
-        self.assertEqual(len(records), 3)
+        self.assertEqual(len(records), 6)
         self.assertEqual(records[0]["mode"], "classical-only")
-        self.assertEqual(records[1]["mode"], "pq-only")
-        self.assertEqual(records[2]["mode"], "hybrid")
-        self.assertEqual(records[2]["downgrade_variant"], "none")
-        self.assertEqual(records[2]["negotiated_mode"], "hybrid")
+        self.assertEqual(records[2]["mode"], "pq-only")
+        self.assertEqual(records[4]["mode"], "hybrid")
+        self.assertIn("attack_variant", records[4])
+        self.assertIn("attack_detected", records[4])
+        self.assertEqual(records[4]["downgrade_variant"], "none")
+        self.assertEqual(records[4]["negotiated_mode"], "hybrid")
 
         report = render_hybrid_scenarios_report(records)
         self.assertIn("HYBRID PQ SCENARIO SWEEP", report)

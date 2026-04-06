@@ -114,6 +114,19 @@ class TestCliExperiments(unittest.TestCase):
             "certificate_verify_bytes": 1,
             "finished_bytes": 1,
             "estimated_total_bytes": 4,
+            "flight_count": 7,
+            "transcript_hash_hex": "00" * 32,
+            "flight_trace": [],
+            "semantic_bindings": ["transcript_binding:finished"],
+            "ciphersuite": "TLS13-IETF-PQT-MLKEM768-MLDSA87-SHA384",
+            "draft": "ietf-pqtls-00",
+            "compatibility": {
+                "compatible": True,
+                "issues": [],
+                "warnings": [],
+                "known_ciphersuite": True,
+                "profile": {},
+            },
         }
         render_report.return_value = "tls-report"
 
@@ -127,6 +140,10 @@ class TestCliExperiments(unittest.TestCase):
                     "pq-only",
                     "--kem-params",
                     "ML-KEM-768",
+                    "--ciphersuite",
+                    "TLS13-IETF-PQT-MLKEM768-MLDSA87-SHA384",
+                    "--draft",
+                    "ietf-pqtls-00",
                     "--runs",
                     "1",
                     "--authenticate-server",
@@ -165,9 +182,9 @@ class TestCliExperiments(unittest.TestCase):
                     "--modes",
                     "hybrid",
                     "pq-only",
-                    "--downgrade-variants",
+                    "--attack-variants",
                     "none",
-                    "strip-pq",
+                    "mitm-transcript-mutation",
                     "--iterations",
                     "1",
                 ]
