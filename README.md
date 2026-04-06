@@ -9,6 +9,14 @@ Lattice-based post-quantum cryptography playground focused on clear, testable im
 
 Current status: v0.1.0 released.
 
+## Documentation
+
+- Usage guide: `docs/USAGE_GUIDE.md`
+- API reference: `docs/API_REFERENCE.md`
+- Architecture: `docs/ARCHITECTURE.md`
+- Security notes: `docs/SECURITY.md`
+- Performance guide: `docs/PERFORMANCE.md`
+
 ## Release Highlights
 
 - Working ML-KEM flow: key generation, encapsulation, decapsulation
