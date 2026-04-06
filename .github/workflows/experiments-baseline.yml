@@ -1,0 +1,51 @@
+name: Experiments Baseline
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  schedule:
+    - cron: "43 3 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  update-main-baseline:
+    name: Update Main Experiment Baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Generate main baseline
+        run: |
+          mkdir -p coverage/experiments
+          python scratch.py experiment parametric-benchmarks \
+            --kem-params ML-KEM-512 ML-KEM-768 ML-KEM-1024 \
+            --dsa-params ML-DSA-44 ML-DSA-65 ML-DSA-87 \
+            --iterations 1 \
+            --warmup 0 > coverage/experiments/main-parametric-baseline.json
+
+      - name: Commit baseline updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add coverage/experiments/main-parametric-baseline.json
+          if git diff --cached --quiet; then
+            echo "No experiment baseline changes to commit"
+            exit 0
+          fi
+          git commit -m "chore(ci): update main experiment baseline [skip ci]"
+          git push

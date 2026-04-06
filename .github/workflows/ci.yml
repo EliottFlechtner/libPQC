@@ -99,11 +99,16 @@ jobs:
         if: matrix.python-version == '3.12'
         run: |
           mkdir -p experiment_artifacts
-          python scratch.py experiment parametric-benchmarks \
-            --kem-params ML-KEM-512 ML-KEM-768 \
-            --dsa-params ML-DSA-44 ML-DSA-65 \
-            --iterations 1 \
-            --warmup 0 > experiment_artifacts/parametric-baseline.json
+
+          if [ -f coverage/experiments/main-parametric-baseline.json ]; then
+            cp coverage/experiments/main-parametric-baseline.json experiment_artifacts/parametric-baseline.json
+          else
+            python scratch.py experiment parametric-benchmarks \
+              --kem-params ML-KEM-512 ML-KEM-768 \
+              --dsa-params ML-DSA-44 ML-DSA-65 \
+              --iterations 1 \
+              --warmup 0 > experiment_artifacts/parametric-baseline.json
+          fi
 
           python scratch.py experiment performance-regression \
             --baseline experiment_artifacts/parametric-baseline.json \
