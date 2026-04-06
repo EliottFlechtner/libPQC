@@ -9,6 +9,14 @@ Lattice-based post-quantum cryptography playground focused on clear, testable im
 
 Current status: v0.1.0 released.
 
+## Documentation
+
+- Usage guide: `docs/USAGE_GUIDE.md`
+- API reference: `docs/API_REFERENCE.md`
+- Architecture: `docs/ARCHITECTURE.md`
+- Security notes: `docs/SECURITY.md`
+- Performance guide: `docs/PERFORMANCE.md`
+
 ## Release Highlights
 
 - Working ML-KEM flow: key generation, encapsulation, decapsulation
@@ -146,6 +154,18 @@ recovered = kyber_pke_decryption(ciphertext, sk, params=params)
 
 assert recovered == message
 ```
+
+## Interoperability
+
+The CLI now includes export/import helpers that emit canonical JSON bundles and standards-friendly packed hex for downstream tools:
+
+```bash
+python3 scratch.py interop export ml-kem keypair --params ML-KEM-768 --output ml-kem-keypair.json
+python3 scratch.py interop export ml-dsa test-vector --params ML-DSA-87 --message 'interop message 32-bytes exact!!' --output ml-dsa-vector.json
+python3 scratch.py interop import ml-kem keypair --input ml-kem-keypair.json
+```
+
+Exported bundles include the libPQC JSON payload plus packed RSP hex where applicable, which makes it easier to feed the data into KAT tooling or external test harnesses.
 
 ## Testing
 

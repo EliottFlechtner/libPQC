@@ -164,24 +164,31 @@ class TestMlDsaVerifySimplified(unittest.TestCase):
         sig44 = ml_dsa_sign(msg, sk44)
         sig87 = ml_dsa_sign(msg, sk87)
 
-        # Cross-parameter verification should fail (may raise ValueError or return False)
-        try:
-            result = ml_dsa_verify(msg, sig44, vk87, params="87")
-            self.assertFalse(result)
-        except ValueError:
-            # Expected when rank mismatches
-            pass
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_verify(msg, sig44, vk87, params="ML-DSA-44")
 
-        try:
-            result = ml_dsa_verify(msg, sig87, vk44, params="44")
-            self.assertFalse(result)
-        except ValueError:
-            # Expected when rank mismatches
-            pass
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_verify(msg, sig87, vk44, params="ML-DSA-87")
 
         # Same-parameter verification should pass
-        self.assertTrue(ml_dsa_verify(msg, sig44, vk44, params="44"))
-        self.assertTrue(ml_dsa_verify(msg, sig87, vk87, params="87"))
+        self.assertTrue(ml_dsa_verify(msg, sig44, vk44, params="ML-DSA-44"))
+        self.assertTrue(ml_dsa_verify(msg, sig87, vk87, params="ML-DSA-87"))
+
+    def test_verify_rejects_malformed_hex_fields(self):
+        vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"verify-bad-hex")
+        sig = ml_dsa_sign(b"msg", sk, rnd=b"rnd")
+        sig_obj = serialization.from_bytes(sig)
+        vk_obj = serialization.from_bytes(vk)
+
+        bad_sig = dict(sig_obj)
+        bad_sig["c_tilde"] = "not-hex"
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_verify(b"msg", serialization.to_bytes(bad_sig), vk)
+
+        bad_vk = dict(vk_obj)
+        bad_vk["rho"] = "not-hex"
+        with self.assertRaises(ValueError):
+            _ = ml_dsa_verify(b"msg", sig, serialization.to_bytes(bad_vk))
 
     def test_verify_input_type_validation(self):
         vk, sk = ml_dsa_keygen("ML-DSA-87", aseed=b"verify-type-check")

@@ -1,4 +1,5 @@
 import unittest
+from typing import cast
 
 from src.core.module import Module, ModuleElement
 from src.core.polynomials import (
@@ -82,8 +83,8 @@ class TestModule(unittest.TestCase):
 
     def test_scalar_multiplication_int(self):
         v = self.M2.element([[1, 2], [3]])
-        out_left = 2 * v
-        out_right = v * 2
+        out_left = cast(ModuleElement, 2 * v)
+        out_right = cast(ModuleElement, v * 2)
 
         self.assertEqual(out_left.entries[0].coefficients, [2, 4])
         self.assertEqual(out_left.entries[1].coefficients, [1])
@@ -93,7 +94,7 @@ class TestModule(unittest.TestCase):
     def test_scalar_multiplication_polynomial(self):
         v = self.M2.element([[1, 0, 1], [2]])
         a = self.R.polynomial([0, 1])
-        out = a * v
+        out = cast(ModuleElement, a * v)
 
         self.assertEqual(out.entries[0].coefficients, [4, 1])
         self.assertEqual(out.entries[1].coefficients, [0, 2])
@@ -106,7 +107,7 @@ class TestModule(unittest.TestCase):
         # <v, w> = (1+x)*2 + x^2*(3+x)
         #        = 2 + 2x + 3x^2 + x^3
         # In R = Z5[X]/(X^3+1): x^3 = -1 => result = 1 + 2x + 3x^2
-        ip = v * w
+        ip = cast(QuotientPolynomial, v * w)
 
         self.assertIsInstance(ip, QuotientPolynomial)
         self.assertEqual(ip.coefficients, [1, 2, 3])
@@ -115,7 +116,8 @@ class TestModule(unittest.TestCase):
         v = self.M2.element([[1], [1, 1]])
         w = self.M2.element([[2, 1], [4]])
 
-        self.assertEqual((v * w).coefficients, v.inner_product(w).coefficients)
+        product = cast(QuotientPolynomial, v * w)
+        self.assertEqual(product.coefficients, v.inner_product(w).coefficients)
 
     def test_zero_and_basis(self):
         z = self.M2.zero()
@@ -215,10 +217,8 @@ class TestModule(unittest.TestCase):
         # a = (93 + 51x + 34x^2 + 54x^3, 27 + 87x + 81x^2 + 6x^3, 112 + 15x + 46x^2 + 122x^3)
         a = M3.element([[93, 51, 34, 54], [27, 87, 81, 6], [112, 15, 46, 122]])
 
-        # TODO
         norm_a = a.inf_norm()
-        self.assertGreaterEqual(norm_a, 0)
-        self.assertLessEqual(norm_a, 68)  # Max symmetric value for Z_137
+        self.assertEqual(norm_a, 56)
 
     def test_inf_norm_vector_operations(self):
         """Test infinity norm after vector operations."""

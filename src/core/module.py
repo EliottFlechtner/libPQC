@@ -18,6 +18,8 @@ Example:
 
 """
 
+from typing import overload
+
 from .polynomials import QuotientPolynomial, QuotientPolynomialRing
 
 
@@ -117,7 +119,7 @@ class ModuleElement:
         new_entries = [a - b for a, b in zip(self.entries, other.entries)]
         return ModuleElement(self.module, new_entries)
 
-    def scalar_mul(self, scalar):
+    def scalar_mul(self, scalar) -> "ModuleElement":
         """Multiply the vector by a scalar (each entry multiplied by the scalar polynomial).
 
         Args:
@@ -134,7 +136,7 @@ class ModuleElement:
         new_entries = [scalar_poly * entry for entry in self.entries]
         return ModuleElement(self.module, new_entries)
 
-    def inner_product(self, other):
+    def inner_product(self, other) -> QuotientPolynomial:
         """Compute the inner product <self, other> = sum_i self_i * other_i in R_q.
 
         Computes the component-wise product of polynomials and sums the results into
@@ -162,7 +164,16 @@ class ModuleElement:
             acc = acc + (left * right)
         return acc
 
-    def __rmul__(self, scalar):
+    @overload
+    def __rmul__(self, scalar: QuotientPolynomial) -> "ModuleElement": ...
+
+    @overload
+    def __rmul__(self, scalar: int) -> "ModuleElement": ...
+
+    @overload
+    def __rmul__(self, scalar) -> "ModuleElement": ...
+
+    def __rmul__(self, scalar) -> "ModuleElement":
         """Right multiplication support for scalar * vector (symmetry with __mul__).
 
         Args:
@@ -172,6 +183,15 @@ class ModuleElement:
             ModuleElement: The scaled vector scalar * self.
         """
         return self.scalar_mul(scalar)
+
+    @overload
+    def __mul__(self, other: "ModuleElement") -> QuotientPolynomial: ...
+
+    @overload
+    def __mul__(self, other: QuotientPolynomial) -> "ModuleElement": ...
+
+    @overload
+    def __mul__(self, other) -> "ModuleElement": ...
 
     def __mul__(self, other):
         """Multiplication operator supporting both scalar multiplication and inner product.
@@ -193,7 +213,7 @@ class ModuleElement:
             return self.inner_product(other)
         return self.scalar_mul(other)
 
-    def inf_norm(self):
+    def inf_norm(self) -> int:
         """Compute the infinite norm of the vector (maximum infinity norm of entries).
 
         The infinity norm of a module element is the maximum infinity norm among all
@@ -209,7 +229,7 @@ class ModuleElement:
         """
         return max(entry.inf_norm() for entry in self.entries)
 
-    def is_small(self, eta):
+    def is_small(self, eta) -> bool:
         """Check if this vector belongs to S_eta^k = {v : inf_norm(v) <= eta}.
 
         This is useful in lattice-based cryptography for checking if a vector

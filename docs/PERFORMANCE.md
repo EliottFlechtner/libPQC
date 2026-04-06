@@ -191,8 +191,18 @@ The following describes expected bottlenecks **based on algorithm analysis**, no
 To establish what the actual bottlenecks are:
 
 ```bash
-# Python profiling with cProfile
-python -m cProfile -s cumtime -o libpqc_profile.txt scratch.py
+ # Deterministic benchmarks for the main operations
+ python3 scratch.py benchmark ml-kem keygen --iterations 25
+ python3 scratch.py benchmark ml-kem encaps --iterations 25
+ python3 scratch.py benchmark ml-kem decaps --iterations 25
+ python3 scratch.py benchmark ml-dsa sign --iterations 25
+ python3 scratch.py benchmark ml-dsa verify --iterations 25
+ python3 scratch.py benchmark core poly-mul --iterations 25
+
+ # Python profiling with cProfile
+ python3 scratch.py profile ml-kem keygen --iterations 1 --limit 20
+ python3 scratch.py profile ml-dsa sign --iterations 1 --limit 20
+ python3 scratch.py profile core poly-mul --iterations 1 --limit 20
 
 # Visualize with snakeviz
 pip install snakeviz
