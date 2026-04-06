@@ -124,7 +124,9 @@ class TestParametricExperiments(unittest.TestCase):
         self.assertEqual(records[0]["family"], "ml-kem")
         self.assertEqual(records[0]["baseline_params"], "ML-KEM-512")
         self.assertEqual(records[0]["relative_slowdown"], 1.0)
-        self.assertEqual(records[1]["relative_slowdown"], 1.0)
+        self.assertGreater(
+            records[1]["relative_slowdown"], 1.0
+        )  # ML-KEM-768 is slower than baseline
         self.assertGreater(records[1]["throughput_ops_per_second"], 0)
 
         report = render_parametric_benchmark_report(records)
