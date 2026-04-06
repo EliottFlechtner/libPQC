@@ -6,7 +6,8 @@ import argparse
 import json
 import sys
 import traceback
-from typing import Callable, Sequence
+from pathlib import Path
+from typing import Callable, Mapping, Sequence
 
 from demos import (
     attack_cost_comparison_demo,
@@ -17,6 +18,7 @@ from demos import (
 from demos.ml_dsa_demo import main as run_ml_dsa_demo
 from demos.ml_kem_demo import main as run_ml_kem_demo
 from src.app import performance
+from src.app import interoperability
 from src.schemes.ml_dsa.keygen import ml_dsa_keygen
 from src.schemes.ml_dsa.sign import ml_dsa_sign
 from src.schemes.ml_dsa.verify import ml_dsa_verify
@@ -45,8 +47,8 @@ DEMO_COMMANDS: dict[str, list[DemoEntry]] = {
 }
 
 
-def _print_json(payload: dict[str, object]) -> None:
-    print(json.dumps(payload, indent=2, sort_keys=True))
+def _print_json(payload: Mapping[str, object]) -> None:
+    print(json.dumps(dict(payload), indent=2, sort_keys=True))
 
 
 def _hex_bytes(value: str, label: str) -> bytes:
@@ -326,6 +328,143 @@ def _handle_ml_dsa_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+def _emit_document(document: dict[str, object], output: Path | None) -> int:
+    if output is not None:
+        interoperability.dump_document(document, output)
+        return 0
+    _print_json(document)
+    return 0
+
+
+def _handle_interop_export(args: argparse.Namespace) -> int:
+    if args.scheme == "ml-kem":
+        if args.artifact == "keypair":
+            encapsulation_key, decapsulation_key = ml_kem_keygen(
+                args.params, aseed=args.aseed, zseed=args.zseed
+            )
+            document = interoperability.export_ml_kem_keypair(
+                encapsulation_key, decapsulation_key, args.params
+            )
+        elif args.artifact == "ciphertext":
+            if args.message is None and args.message_hex is None:
+                message = interoperability.DEFAULT_ML_KEM_MESSAGE
+            else:
+                message = _text_or_hex_bytes(args.message, args.message_hex, "message")
+                if isinstance(message, str):
+                    message = message.encode("utf-8")
+            shared_key, ciphertext = ml_kem_encaps(
+                _hex_bytes(args.ek_hex, "ek-hex"),
+                params=args.params,
+                message=message,
+            )
+            document = interoperability.export_ml_kem_ciphertext(
+                ciphertext, args.params, shared_key=shared_key
+            )
+        else:
+            message = _text_or_hex_bytes(args.message, args.message_hex, "message")
+            if isinstance(message, str):
+                message = message.encode("utf-8")
+            document = interoperability.export_ml_kem_test_vector(
+                params=args.params,
+                aseed=args.aseed,
+                zseed=args.zseed,
+                message=message,
+            )
+    else:
+        if args.artifact == "keypair":
+            verification_key, signing_key = ml_dsa_keygen(args.params, aseed=args.aseed)
+            document = interoperability.export_ml_dsa_keypair(
+                verification_key, signing_key, args.params
+            )
+        elif args.artifact == "signature":
+            message = _text_or_hex_bytes(args.message, args.message_hex, "message")
+            if message is None:
+                message = interoperability.DEFAULT_ML_DSA_MESSAGE
+            elif isinstance(message, str):
+                message = message.encode("utf-8")
+            signature = ml_dsa_sign(
+                message,
+                _hex_bytes(args.sk_hex, "sk-hex"),
+                params=args.params,
+                rnd=args.rnd,
+            )
+            document = interoperability.export_ml_dsa_signature(signature, args.params)
+        else:
+            message = _text_or_hex_bytes(args.message, args.message_hex, "message")
+            if isinstance(message, str):
+                message = message.encode("utf-8")
+            document = interoperability.export_ml_dsa_test_vector(
+                params=args.params,
+                aseed=args.aseed,
+                message=message,
+                rnd=args.rnd,
+            )
+
+    return _emit_document(document, args.output)
+
+
+def _handle_interop_import(args: argparse.Namespace) -> int:
+    document = interoperability.load_document(args.input)
+    if args.scheme == "ml-kem":
+        if args.artifact == "keypair":
+            encapsulation_key, decapsulation_key = (
+                interoperability.import_ml_kem_keypair(document)
+            )
+            summary = {
+                "scheme": "ML-KEM",
+                "kind": "keypair",
+                "encapsulation_key_hex": encapsulation_key.hex(),
+                "decapsulation_key_hex": decapsulation_key.hex(),
+            }
+        elif args.artifact == "ciphertext":
+            ciphertext = interoperability.import_ml_kem_ciphertext(document)
+            summary = {
+                "scheme": "ML-KEM",
+                "kind": "ciphertext",
+                "ciphertext_hex": ciphertext.hex(),
+            }
+        else:
+            normalized = interoperability.import_ml_kem_test_vector(document)
+            summary = {
+                "scheme": "ML-KEM",
+                "kind": "test-vector",
+                "message_hex": normalized["test_vector"]["message_hex"],
+                "verified": normalized["test_vector"]["decapsulation"]["shared_key_hex"]
+                == normalized["test_vector"]["encapsulation"]["artifacts"][
+                    "shared_key_hex"
+                ],
+            }
+    else:
+        if args.artifact == "keypair":
+            verification_key, signing_key = interoperability.import_ml_dsa_keypair(
+                document
+            )
+            summary = {
+                "scheme": "ML-DSA",
+                "kind": "keypair",
+                "verification_key_hex": verification_key.hex(),
+                "signing_key_hex": signing_key.hex(),
+            }
+        elif args.artifact == "signature":
+            signature = interoperability.import_ml_dsa_signature(document)
+            summary = {
+                "scheme": "ML-DSA",
+                "kind": "signature",
+                "signature_hex": signature.hex(),
+            }
+        else:
+            normalized = interoperability.import_ml_dsa_test_vector(document)
+            summary = {
+                "scheme": "ML-DSA",
+                "kind": "test-vector",
+                "message_hex": normalized["test_vector"]["message_hex"],
+                "verified": normalized["test_vector"]["verification"]["verified"],
+            }
+
+    _print_json(summary)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="libPQC")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -534,6 +673,177 @@ def build_parser() -> argparse.ArgumentParser:
     msg_group.add_argument("--message", help="Message as UTF-8 text")
     msg_group.add_argument("--message-hex", help="Message as hex")
     ml_dsa_verify.set_defaults(handler=_handle_ml_dsa_verify)
+
+    interop_parser = subparsers.add_parser(
+        "interop", help="Export and import interoperable payload bundles"
+    )
+    interop_subparsers = interop_parser.add_subparsers(
+        dest="interop_command", required=True
+    )
+
+    interop_export = interop_subparsers.add_parser(
+        "export", help="Export an interoperable bundle"
+    )
+    interop_export_subparsers = interop_export.add_subparsers(
+        dest="scheme", required=True
+    )
+
+    interop_export_ml_kem = interop_export_subparsers.add_parser(
+        "ml-kem", help="Export ML-KEM bundles"
+    )
+    interop_export_ml_kem_subparsers = interop_export_ml_kem.add_subparsers(
+        dest="artifact", required=True
+    )
+
+    interop_export_ml_kem_keypair = interop_export_ml_kem_subparsers.add_parser(
+        "keypair"
+    )
+    interop_export_ml_kem_keypair.add_argument(
+        "--params", default="ML-KEM-768", help="ML-KEM parameter preset"
+    )
+    interop_export_ml_kem_keypair.add_argument(
+        "--aseed", help="Deterministic keygen seed"
+    )
+    interop_export_ml_kem_keypair.add_argument(
+        "--zseed", help="Deterministic fallback seed"
+    )
+    interop_export_ml_kem_keypair.add_argument(
+        "--output", type=Path, help="Optional output file"
+    )
+    interop_export_ml_kem_keypair.set_defaults(handler=_handle_interop_export)
+
+    interop_export_ml_kem_ciphertext = interop_export_ml_kem_subparsers.add_parser(
+        "ciphertext"
+    )
+    interop_export_ml_kem_ciphertext.add_argument(
+        "--params", default="ML-KEM-768", help="ML-KEM parameter preset"
+    )
+    interop_export_ml_kem_ciphertext.add_argument(
+        "--ek-hex", required=True, help="Encapsulation key as hex"
+    )
+    interop_export_ml_kem_ciphertext.add_argument(
+        "--message", help="Message as UTF-8 text"
+    )
+    interop_export_ml_kem_ciphertext.add_argument(
+        "--message-hex", help="Message as hex"
+    )
+    interop_export_ml_kem_ciphertext.add_argument(
+        "--output", type=Path, help="Optional output file"
+    )
+    interop_export_ml_kem_ciphertext.set_defaults(handler=_handle_interop_export)
+
+    interop_export_ml_kem_vector = interop_export_ml_kem_subparsers.add_parser(
+        "test-vector"
+    )
+    interop_export_ml_kem_vector.add_argument(
+        "--params", default="ML-KEM-768", help="ML-KEM parameter preset"
+    )
+    interop_export_ml_kem_vector.add_argument(
+        "--aseed", help="Deterministic keygen seed"
+    )
+    interop_export_ml_kem_vector.add_argument(
+        "--zseed", help="Deterministic fallback seed"
+    )
+    interop_export_ml_kem_vector.add_argument("--message", help="Message as UTF-8 text")
+    interop_export_ml_kem_vector.add_argument("--message-hex", help="Message as hex")
+    interop_export_ml_kem_vector.add_argument(
+        "--output", type=Path, help="Optional output file"
+    )
+    interop_export_ml_kem_vector.set_defaults(handler=_handle_interop_export)
+
+    interop_export_ml_dsa = interop_export_subparsers.add_parser(
+        "ml-dsa", help="Export ML-DSA bundles"
+    )
+    interop_export_ml_dsa_subparsers = interop_export_ml_dsa.add_subparsers(
+        dest="artifact", required=True
+    )
+
+    interop_export_ml_dsa_keypair = interop_export_ml_dsa_subparsers.add_parser(
+        "keypair"
+    )
+    interop_export_ml_dsa_keypair.add_argument(
+        "--params", default="ML-DSA-87", help="ML-DSA parameter preset"
+    )
+    interop_export_ml_dsa_keypair.add_argument(
+        "--aseed", help="Deterministic keygen seed"
+    )
+    interop_export_ml_dsa_keypair.add_argument(
+        "--output", type=Path, help="Optional output file"
+    )
+    interop_export_ml_dsa_keypair.set_defaults(handler=_handle_interop_export)
+
+    interop_export_ml_dsa_signature = interop_export_ml_dsa_subparsers.add_parser(
+        "signature"
+    )
+    interop_export_ml_dsa_signature.add_argument(
+        "--params", default="ML-DSA-87", help="ML-DSA parameter preset"
+    )
+    interop_export_ml_dsa_signature.add_argument(
+        "--sk-hex", required=True, help="Signing key as hex"
+    )
+    interop_export_ml_dsa_signature.add_argument(
+        "--message", help="Message as UTF-8 text"
+    )
+    interop_export_ml_dsa_signature.add_argument("--message-hex", help="Message as hex")
+    interop_export_ml_dsa_signature.add_argument(
+        "--rnd", help="Optional signing randomness"
+    )
+    interop_export_ml_dsa_signature.add_argument(
+        "--output", type=Path, help="Optional output file"
+    )
+    interop_export_ml_dsa_signature.set_defaults(handler=_handle_interop_export)
+
+    interop_export_ml_dsa_vector = interop_export_ml_dsa_subparsers.add_parser(
+        "test-vector"
+    )
+    interop_export_ml_dsa_vector.add_argument(
+        "--params", default="ML-DSA-87", help="ML-DSA parameter preset"
+    )
+    interop_export_ml_dsa_vector.add_argument(
+        "--aseed", help="Deterministic keygen seed"
+    )
+    interop_export_ml_dsa_vector.add_argument("--message", help="Message as UTF-8 text")
+    interop_export_ml_dsa_vector.add_argument("--message-hex", help="Message as hex")
+    interop_export_ml_dsa_vector.add_argument(
+        "--rnd", help="Optional signing randomness"
+    )
+    interop_export_ml_dsa_vector.add_argument(
+        "--output", type=Path, help="Optional output file"
+    )
+    interop_export_ml_dsa_vector.set_defaults(handler=_handle_interop_export)
+
+    interop_import = interop_subparsers.add_parser(
+        "import", help="Import an interoperable bundle"
+    )
+    interop_import_subparsers = interop_import.add_subparsers(
+        dest="scheme", required=True
+    )
+
+    interop_import_ml_kem = interop_import_subparsers.add_parser(
+        "ml-kem", help="Import ML-KEM bundles"
+    )
+    interop_import_ml_kem_subparsers = interop_import_ml_kem.add_subparsers(
+        dest="artifact", required=True
+    )
+    for artifact in ["keypair", "ciphertext", "test-vector"]:
+        parser_for_name = interop_import_ml_kem_subparsers.add_parser(artifact)
+        parser_for_name.add_argument(
+            "--input", type=Path, required=True, help="Input bundle path"
+        )
+        parser_for_name.set_defaults(handler=_handle_interop_import)
+
+    interop_import_ml_dsa = interop_import_subparsers.add_parser(
+        "ml-dsa", help="Import ML-DSA bundles"
+    )
+    interop_import_ml_dsa_subparsers = interop_import_ml_dsa.add_subparsers(
+        dest="artifact", required=True
+    )
+    for artifact in ["keypair", "signature", "test-vector"]:
+        parser_for_name = interop_import_ml_dsa_subparsers.add_parser(artifact)
+        parser_for_name.add_argument(
+            "--input", type=Path, required=True, help="Input bundle path"
+        )
+        parser_for_name.set_defaults(handler=_handle_interop_import)
 
     return parser
 
