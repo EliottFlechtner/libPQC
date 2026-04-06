@@ -9,8 +9,12 @@ from .channels import (
 )
 from .events import EventLogger, ProtocolEvent
 from .protocols import (
+    GroupHandshakeResult,
+    GroupProtocolRunSummary,
     HandshakeResult,
     ProtocolRunSummary,
+    perform_group_key_agreement,
+    run_group_key_agreement_batch,
     perform_secure_key_agreement,
     run_key_agreement_batch,
 )
@@ -20,6 +24,8 @@ __all__ = [
     "AdversarialChannel",
     "ChannelDeliveryError",
     "EventLogger",
+    "GroupHandshakeResult",
+    "GroupProtocolRunSummary",
     "HandshakePhase",
     "HandshakeResult",
     "ProtocolState",
@@ -29,6 +35,8 @@ __all__ = [
     "ProtocolEvent",
     "SessionState",
     "TransportChannel",
+    "perform_group_key_agreement",
     "perform_secure_key_agreement",
+    "run_group_key_agreement_batch",
     "run_key_agreement_batch",
 ]

@@ -20,7 +20,7 @@ from demos.ml_dsa_demo import main as run_ml_dsa_demo
 from demos.ml_kem_demo import main as run_ml_kem_demo
 from src.app import performance
 from src.app import interoperability
-from src.comms.protocols import run_key_agreement_batch
+from src.comms.protocols import run_group_key_agreement_batch, run_key_agreement_batch
 from src.schemes.ml_dsa.keygen import ml_dsa_keygen
 from src.schemes.ml_dsa.sign import ml_dsa_sign
 from src.schemes.ml_dsa.verify import ml_dsa_verify
@@ -493,6 +493,30 @@ def _handle_comms_key_agreement(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_comms_group_key_agreement(args: argparse.Namespace) -> int:
+    if args.members < 2:
+        raise ValueError("members must be >= 2")
+
+    member_ids = [f"member-{index}" for index in range(1, args.members + 1)]
+    group_seed = None
+    if args.group_seed_hex is not None:
+        group_seed = _hex_bytes(args.group_seed_hex, "group-seed-hex")
+
+    payload = run_group_key_agreement_batch(
+        runs=args.runs,
+        channel_name=args.channel,
+        member_ids=member_ids,
+        kem_params=args.kem_params,
+        noisy_bit_error_rate=args.noisy_bit_error_rate,
+        seed=args.seed,
+        group_seed=group_seed,
+        member_seed_prefix=args.member_seed_prefix,
+        include_events=args.include_events,
+    )
+    _print_json({"command": "comms", "protocol": "group-key-agreement", **payload})
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="libPQC")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -932,6 +956,49 @@ def build_parser() -> argparse.ArgumentParser:
         help="Include per-run protocol event logs in JSON output",
     )
     comms_key_agreement.set_defaults(handler=_handle_comms_key_agreement)
+
+    comms_group_key_agreement = comms_subparsers.add_parser(
+        "group-key-agreement",
+        help="Run a multi-entity ML-KEM group key agreement simulation",
+    )
+    comms_group_key_agreement.add_argument(
+        "--channel",
+        default="perfect",
+        choices=["perfect", "noisy", "adversarial"],
+        help="Channel model to simulate",
+    )
+    comms_group_key_agreement.add_argument(
+        "--kem-params", default="ML-KEM-768", help="ML-KEM parameter preset"
+    )
+    comms_group_key_agreement.add_argument(
+        "--runs", type=int, default=1, help="Number of group handshake runs"
+    )
+    comms_group_key_agreement.add_argument(
+        "--members", type=int, default=3, help="Number of group members"
+    )
+    comms_group_key_agreement.add_argument(
+        "--noisy-bit-error-rate",
+        type=float,
+        default=0.01,
+        help="Bit error rate used by noisy channel",
+    )
+    comms_group_key_agreement.add_argument(
+        "--seed", type=int, help="Optional deterministic seed for channel randomness"
+    )
+    comms_group_key_agreement.add_argument(
+        "--group-seed-hex",
+        help="Optional deterministic 32-byte group seed as hex",
+    )
+    comms_group_key_agreement.add_argument(
+        "--member-seed-prefix",
+        help="Optional deterministic per-member keygen seed prefix",
+    )
+    comms_group_key_agreement.add_argument(
+        "--include-events",
+        action="store_true",
+        help="Include per-run protocol event logs in JSON output",
+    )
+    comms_group_key_agreement.set_defaults(handler=_handle_comms_group_key_agreement)
 
     return parser
 
