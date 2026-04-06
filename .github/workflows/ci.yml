@@ -95,6 +95,27 @@ jobs:
           LIBPQC_KAT_MAX_RECORDS=1000 LIBPQC_KAT_REQUIRE_FULL=1 LIBPQC_KAT_PROGRESS=1 LIBPQC_KAT_TIMING=1 \
           python -m unittest tests/conformance/test_ml_kem_kat.py tests/conformance/test_ml_dsa_kat.py
 
+      - name: Experiment regression threshold gate
+        if: matrix.python-version == '3.12'
+        run: |
+          mkdir -p experiment_artifacts
+          python scratch.py experiment parametric-benchmarks \
+            --kem-params ML-KEM-512 ML-KEM-768 \
+            --dsa-params ML-DSA-44 ML-DSA-65 \
+            --iterations 1 \
+            --warmup 0 > experiment_artifacts/parametric-baseline.json
+
+          python scratch.py experiment performance-regression \
+            --baseline experiment_artifacts/parametric-baseline.json \
+            --kem-params ML-KEM-512 ML-KEM-768 \
+            --dsa-params ML-DSA-44 ML-DSA-65 \
+            --iterations 1 \
+            --warmup 0 \
+            --threshold-ratio 2.0 \
+            --strict \
+            --current-output experiment_artifacts/parametric-current.json \
+            > experiment_artifacts/performance-regression.json
+
       - name: Coverage summary
         if: matrix.python-version == '3.12'
         run: coverage report -m
@@ -120,6 +141,16 @@ jobs:
             coverage.xml
             coverage.json
             htmlcov
+
+      - name: Upload experiment artifacts
+        if: matrix.python-version == '3.12' && always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: experiments-py312
+          path: |
+            experiment_artifacts/parametric-baseline.json
+            experiment_artifacts/parametric-current.json
+            experiment_artifacts/performance-regression.json
 
   smoke:
     name: Smoke (entrypoint)
