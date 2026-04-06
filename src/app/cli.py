@@ -24,6 +24,7 @@ from src.app import interoperability
 from src.experiments import (
     DEFAULT_BUDGET_POWERS,
     DEFAULT_DOWNGRADE_VARIANTS,
+    DEFAULT_TLS_DRAFT,
     DEFAULT_HYBRID_MODES,
     DEFAULT_ML_DSA_PARAMS,
     DEFAULT_ML_KEM_PARAMS,
@@ -697,6 +698,9 @@ def _handle_experiment_tls_handshake(args: argparse.Namespace) -> int:
         dsa_params=args.dsa_params,
         runs=args.runs,
         authenticate_server=args.authenticate_server,
+        ciphersuite=args.ciphersuite,
+        draft=args.draft,
+        enforce_compatibility=not args.skip_compatibility_check,
     )
     _print_json(
         {
@@ -1473,6 +1477,20 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable ML-DSA certificate verify stage",
     )
+    experiment_tls.add_argument(
+        "--ciphersuite",
+        help="Optional TLS ciphersuite profile identifier (auto-selected by default)",
+    )
+    experiment_tls.add_argument(
+        "--draft",
+        default=DEFAULT_TLS_DRAFT,
+        help="Ciphersuite draft label",
+    )
+    experiment_tls.add_argument(
+        "--skip-compatibility-check",
+        action="store_true",
+        help="Allow running even if ciphersuite compatibility checks fail",
+    )
     experiment_tls.set_defaults(handler=_handle_experiment_tls_handshake)
 
     experiment_hybrid = experiment_subparsers.add_parser(
@@ -1489,9 +1507,17 @@ def build_parser() -> argparse.ArgumentParser:
     experiment_hybrid.add_argument(
         "--downgrade-variants",
         nargs="+",
+        dest="downgrade_variants",
         default=list(DEFAULT_DOWNGRADE_VARIANTS),
         choices=list(DEFAULT_DOWNGRADE_VARIANTS),
-        help="Downgrade attack variants to simulate",
+        help="Legacy alias for attack variants to simulate",
+    )
+    experiment_hybrid.add_argument(
+        "--attack-variants",
+        nargs="+",
+        dest="downgrade_variants",
+        choices=list(DEFAULT_DOWNGRADE_VARIANTS),
+        help="Attack variants to simulate (includes downgrade/MITM/drop/replay)",
     )
     experiment_hybrid.add_argument(
         "--kem-params",

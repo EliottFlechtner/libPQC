@@ -5,23 +5,34 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from hashlib import sha3_256
 from time import perf_counter
-from typing import Literal, Sequence
+from typing import Literal, Sequence, cast
 
 from src.experiments.scenarios.tls_handshake import simulate_post_quantum_tls_handshake
 
 
 HybridMode = Literal["classical-only", "pq-only", "hybrid"]
-DowngradeVariant = Literal["none", "strip-pq", "strip-classical"]
+AttackVariant = Literal[
+    "none",
+    "strip-pq",
+    "strip-classical",
+    "mitm-transcript-mutation",
+    "drop-server-finished",
+    "replay-server-hello",
+]
 DEFAULT_HYBRID_MODES: tuple[HybridMode, ...] = (
     "classical-only",
     "pq-only",
     "hybrid",
 )
-DEFAULT_DOWNGRADE_VARIANTS: tuple[DowngradeVariant, ...] = (
+DEFAULT_DOWNGRADE_VARIANTS: tuple[AttackVariant, ...] = (
     "none",
     "strip-pq",
     "strip-classical",
+    "mitm-transcript-mutation",
+    "drop-server-finished",
+    "replay-server-hello",
 )
+DEFAULT_HYBRID_ATTACK_VARIANTS = DEFAULT_DOWNGRADE_VARIANTS
 
 
 _CLASSICAL_PRIME = (1 << 127) - 1
@@ -32,10 +43,14 @@ _CLASSICAL_GENERATOR = 5
 class HybridScenarioRecord:
     mode: HybridMode
     negotiated_mode: HybridMode
-    downgrade_variant: DowngradeVariant
+    downgrade_variant: AttackVariant
     downgrade_attempted: bool
     downgrade_detected: bool
     downgrade_succeeded: bool
+    attack_variant: AttackVariant
+    attack_detected: bool
+    attack_succeeded: bool
+    attack_notes: list[str]
     kem_params: str
     dsa_params: str
     iterations: int
@@ -61,7 +76,7 @@ def _validate_modes(modes: Sequence[str]) -> tuple[HybridMode, ...]:
 
 def _validate_downgrade_variants(
     variants: Sequence[str],
-) -> tuple[DowngradeVariant, ...]:
+) -> tuple[AttackVariant, ...]:
     normalized = tuple(variants)
     if not normalized:
         raise ValueError("downgrade_variants must contain at least one value")
@@ -102,13 +117,64 @@ def _classical_benchmark_mean(iterations: int) -> float:
 
 def _apply_downgrade(
     requested_mode: HybridMode,
-    variant: DowngradeVariant,
+    variant: AttackVariant,
 ) -> HybridMode:
     if variant == "strip-pq" and requested_mode in {"pq-only", "hybrid"}:
         return "classical-only"
     if variant == "strip-classical" and requested_mode == "hybrid":
         return "pq-only"
     return requested_mode
+
+
+def _simulate_active_attack(
+    variant: AttackVariant,
+    tls_record: dict[str, object],
+) -> tuple[bool, bool, list[str]]:
+    if variant == "none":
+        return False, False, []
+
+    if variant in {"strip-pq", "strip-classical"}:
+        return False, False, ["downgrade pathway handled by mode negotiation"]
+
+    trace = cast(list[object], tls_record.get("flight_trace", []))
+    semantics = set(
+        str(value)
+        for value in cast(list[object], tls_record.get("semantic_bindings", []))
+    )
+    notes: list[str] = []
+
+    if variant == "mitm-transcript-mutation":
+        notes.append("mutated ServerHello transcript hash")
+        detected = "transcript_binding:finished" in semantics
+        succeeded = not detected
+        return detected, succeeded, notes
+
+    if variant == "drop-server-finished":
+        has_server_finished = any(
+            isinstance(flight, dict)
+            and flight.get("sender") == "server"
+            and flight.get("message_type") == "Finished"
+            for flight in trace
+        )
+        notes.append("dropped server Finished flight")
+        detected = has_server_finished
+        succeeded = False
+        return detected, succeeded, notes
+
+    if variant == "replay-server-hello":
+        server_hello_count = sum(
+            1
+            for flight in trace
+            if isinstance(flight, dict) and flight.get("message_type") == "ServerHello"
+        )
+        notes.append("replayed ServerHello flight")
+        detected = (
+            server_hello_count >= 1 and "transcript_binding:finished" in semantics
+        )
+        succeeded = not detected
+        return detected, succeeded, notes
+
+    return False, False, ["unknown attack variant"]
 
 
 def simulate_hybrid_pq_scenarios(
@@ -139,6 +205,9 @@ def simulate_hybrid_pq_scenarios(
                 pq_bits = 0
                 effective_bits = classical_bits
                 downgrade_score = 0.2 if mode == "classical-only" else 0.0
+                attack_detected = False
+                attack_succeeded = False
+                attack_notes = ["classical-only path has no PQ transcript to mutate"]
             else:
                 tls_mode = "hybrid" if negotiated_mode == "hybrid" else "pq-only"
                 tls_record = simulate_post_quantum_tls_handshake(
@@ -147,8 +216,9 @@ def simulate_hybrid_pq_scenarios(
                     dsa_params=dsa_params,
                     runs=iterations,
                     authenticate_server=True,
+                    enforce_compatibility=False,
                 )
-                mean_seconds = float(tls_record["mean_seconds"])
+                mean_seconds = cast(float, tls_record["mean_seconds"])
                 classical_bits = 128 if negotiated_mode == "hybrid" else 0
                 pq_bits = 192
                 effective_bits = min(
@@ -156,6 +226,12 @@ def simulate_hybrid_pq_scenarios(
                     pq_bits,
                 )
                 downgrade_score = 1.0 if negotiated_mode == "hybrid" else 0.7
+                attack_detected, attack_succeeded, attack_notes = (
+                    _simulate_active_attack(
+                        variant,
+                        tls_record,
+                    )
+                )
 
             records.append(
                 HybridScenarioRecord(
@@ -165,6 +241,10 @@ def simulate_hybrid_pq_scenarios(
                     downgrade_attempted=downgrade_attempted,
                     downgrade_detected=downgrade_detected,
                     downgrade_succeeded=downgrade_succeeded,
+                    attack_variant=variant,
+                    attack_detected=attack_detected,
+                    attack_succeeded=attack_succeeded,
+                    attack_notes=attack_notes,
                     kem_params=kem_params,
                     dsa_params=dsa_params,
                     iterations=iterations,

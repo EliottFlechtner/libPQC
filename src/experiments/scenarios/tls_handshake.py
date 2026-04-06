@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from hashlib import sha3_256
 from time import perf_counter
-from typing import Literal, Sequence
+from typing import Literal, Sequence, cast
 
 from src.schemes.ml_dsa.keygen import ml_dsa_keygen
 from src.schemes.ml_dsa.sign import ml_dsa_sign
@@ -17,6 +17,33 @@ from src.schemes.ml_kem.keygen import ml_kem_keygen
 
 TlsMode = Literal["pq-only", "hybrid"]
 DEFAULT_TLS_MODES: tuple[TlsMode, ...] = ("pq-only", "hybrid")
+DEFAULT_TLS_DRAFT = "ietf-pqtls-00"
+DEFAULT_TLS_CIPHERSUITE = "TLS13-IETF-PQT-MLKEM768-MLDSA87-SHA384"
+
+
+TLS_CIPHERSUITE_PROFILES: dict[str, dict[str, object]] = {
+    "TLS13-IETF-PQT-MLKEM512-MLDSA44-SHA256": {
+        "kem_params": "ML-KEM-512",
+        "dsa_params": "ML-DSA-44",
+        "hash": "SHA256",
+        "modes": ("pq-only", "hybrid"),
+        "drafts": ("ietf-pqtls-00", "ietf-pqtls-01"),
+    },
+    "TLS13-IETF-PQT-MLKEM768-MLDSA87-SHA384": {
+        "kem_params": "ML-KEM-768",
+        "dsa_params": "ML-DSA-87",
+        "hash": "SHA384",
+        "modes": ("pq-only", "hybrid"),
+        "drafts": ("ietf-pqtls-00", "ietf-pqtls-01"),
+    },
+    "TLS13-IETF-PQT-MLKEM1024-MLDSA87-SHA384": {
+        "kem_params": "ML-KEM-1024",
+        "dsa_params": "ML-DSA-87",
+        "hash": "SHA384",
+        "modes": ("pq-only",),
+        "drafts": ("ietf-pqtls-01",),
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -41,6 +68,9 @@ class TlsHandshakeRecord:
     transcript_hash_hex: str
     flight_trace: list[dict[str, object]]
     semantic_bindings: list[str]
+    ciphersuite: str
+    draft: str
+    compatibility: dict[str, object]
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -57,6 +87,71 @@ def _derive_hybrid_secret(pq_secret: bytes, classical_secret: bytes) -> bytes:
 
 def _seed32(label: str, index: int) -> bytes:
     return sha3_256(f"{label}:{index}".encode("utf-8")).digest()
+
+
+def _check_ciphersuite_compatibility(
+    ciphersuite: str,
+    draft: str,
+    mode: TlsMode,
+    kem_params: str,
+    dsa_params: str,
+) -> dict[str, object]:
+    profile = TLS_CIPHERSUITE_PROFILES.get(ciphersuite)
+    issues: list[str] = []
+    warnings: list[str] = []
+    if profile is None:
+        warnings.append("unknown ciphersuite profile")
+        return {
+            "known_ciphersuite": False,
+            "compatible": False,
+            "issues": ["unsupported ciphersuite"],
+            "warnings": warnings,
+            "profile": None,
+        }
+
+    if str(profile["kem_params"]) != kem_params:
+        issues.append(
+            f"kem mismatch: expected {profile['kem_params']}, got {kem_params}"
+        )
+    if str(profile["dsa_params"]) != dsa_params:
+        issues.append(
+            f"dsa mismatch: expected {profile['dsa_params']}, got {dsa_params}"
+        )
+    if mode not in profile["modes"]:
+        issues.append(f"mode {mode} is not allowed for ciphersuite {ciphersuite}")
+    if draft not in profile["drafts"]:
+        issues.append(f"draft {draft} not listed for ciphersuite {ciphersuite}")
+
+    return {
+        "known_ciphersuite": True,
+        "compatible": len(issues) == 0,
+        "issues": issues,
+        "warnings": warnings,
+        "profile": {
+            "kem_params": profile["kem_params"],
+            "dsa_params": profile["dsa_params"],
+            "hash": profile["hash"],
+            "modes": list(profile["modes"]),
+            "drafts": list(profile["drafts"]),
+        },
+    }
+
+
+def _select_ciphersuite_for_context(
+    mode: TlsMode,
+    kem_params: str,
+    dsa_params: str,
+    draft: str,
+) -> str:
+    for ciphersuite, profile in TLS_CIPHERSUITE_PROFILES.items():
+        if (
+            str(profile["kem_params"]) == kem_params
+            and str(profile["dsa_params"]) == dsa_params
+            and mode in cast(tuple[TlsMode, ...], profile["modes"])
+            and draft in cast(tuple[str, ...], profile["drafts"])
+        ):
+            return ciphersuite
+    return DEFAULT_TLS_CIPHERSUITE
 
 
 def _append_flight(
@@ -97,6 +192,9 @@ def simulate_post_quantum_tls_handshake(
     dsa_params: str = "ML-DSA-87",
     runs: int = 1,
     authenticate_server: bool = True,
+    ciphersuite: str | None = None,
+    draft: str = DEFAULT_TLS_DRAFT,
+    enforce_compatibility: bool = True,
 ) -> dict[str, object]:
     """Simulate a TLS-style handshake using PQ-only or hybrid key schedule."""
 
@@ -104,6 +202,23 @@ def simulate_post_quantum_tls_handshake(
         raise ValueError("runs must be a positive integer")
     if mode not in DEFAULT_TLS_MODES:
         raise ValueError(f"unsupported TLS mode: {mode}")
+    selected_ciphersuite = (
+        ciphersuite
+        if ciphersuite is not None
+        else _select_ciphersuite_for_context(mode, kem_params, dsa_params, draft)
+    )
+    compatibility = _check_ciphersuite_compatibility(
+        selected_ciphersuite,
+        draft,
+        mode,
+        kem_params,
+        dsa_params,
+    )
+    if enforce_compatibility and not bool(compatibility["compatible"]):
+        raise ValueError(
+            "incompatible TLS configuration: "
+            + "; ".join(str(issue) for issue in compatibility["issues"])
+        )
 
     durations: list[float] = []
     successes = 0
@@ -290,5 +405,8 @@ def simulate_post_quantum_tls_handshake(
         transcript_hash_hex=first_run_transcript_hash_hex,
         flight_trace=first_run_trace,
         semantic_bindings=first_run_semantics,
+        ciphersuite=selected_ciphersuite,
+        draft=draft,
+        compatibility=compatibility,
     )
     return record.to_dict()
