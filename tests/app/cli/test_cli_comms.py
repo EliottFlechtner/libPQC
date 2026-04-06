@@ -2,6 +2,8 @@ import json
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
+from pathlib import Path
+import tempfile
 
 from src.app import cli
 
@@ -125,6 +127,94 @@ class TestCliComms(unittest.TestCase):
         self.assertEqual(payload["successes"], 0)
         self.assertEqual(payload["failures"], 1)
         self.assertEqual(payload["results"][0]["coordinator_protocol_state"], "failed")
+
+    def test_comms_group_export_and_replay_transcript(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            transcript_path = Path(temp_dir) / "group_transcript.json"
+
+            rc, export_output = self._run_cli(
+                [
+                    "comms",
+                    "group-export-transcript",
+                    "--channel",
+                    "perfect",
+                    "--members",
+                    "3",
+                    "--group-seed-hex",
+                    (b"g" * 32).hex(),
+                    "--member-seed-prefix",
+                    "group-seed-prefix",
+                    "--output",
+                    str(transcript_path),
+                ]
+            )
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(export_output, "")
+            self.assertTrue(transcript_path.exists())
+
+            rc, replay_output = self._run_cli(
+                ["comms", "group-replay-transcript", "--input", str(transcript_path)]
+            )
+            self.assertEqual(rc, 0)
+            replay_payload = json.loads(replay_output)
+            self.assertEqual(replay_payload["protocol"], "group-transcript-replay")
+            self.assertTrue(replay_payload["valid"])
+            self.assertGreater(replay_payload["message_count"], 0)
+
+    def test_comms_group_broadcast(self):
+        rc, output = self._run_cli(
+            [
+                "comms",
+                "group-broadcast",
+                "--channel",
+                "perfect",
+                "--members",
+                "3",
+                "--group-seed-hex",
+                (b"g" * 32).hex(),
+                "--member-seed-prefix",
+                "group-seed-prefix",
+                "--message",
+                "group-message",
+                "--label",
+                "notice",
+            ]
+        )
+
+        self.assertEqual(rc, 0)
+        payload = json.loads(output)
+        self.assertEqual(payload["protocol"], "group-broadcast")
+        self.assertEqual(payload["label"], "notice")
+        self.assertEqual(len(payload["records"]), 3)
+        self.assertTrue(all("tag_hex" in record for record in payload["records"]))
+
+    def test_comms_group_rekey(self):
+        rc, output = self._run_cli(
+            [
+                "comms",
+                "group-rekey",
+                "--channel",
+                "perfect",
+                "--members",
+                "3",
+                "--group-seed-hex",
+                (b"g" * 32).hex(),
+                "--member-seed-prefix",
+                "group-seed-prefix",
+                "--add-member",
+                "dave",
+                "--remove-member",
+                "member-3",
+            ]
+        )
+
+        self.assertEqual(rc, 0)
+        payload = json.loads(output)
+        self.assertEqual(payload["protocol"], "group-rekey")
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["member_ids"], ["member-1", "member-2", "dave"])
+        self.assertTrue(payload["group_key_consensus"])
 
 
 if __name__ == "__main__":

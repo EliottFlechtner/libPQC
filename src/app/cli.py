@@ -20,7 +20,16 @@ from demos.ml_dsa_demo import main as run_ml_dsa_demo
 from demos.ml_kem_demo import main as run_ml_kem_demo
 from src.app import performance
 from src.app import interoperability
-from src.comms.protocols import run_group_key_agreement_batch, run_key_agreement_batch
+from src.comms.protocols import (
+    broadcast_group_message,
+    export_group_transcript,
+    perform_group_key_agreement,
+    rekey_group_membership,
+    replay_group_transcript,
+    run_group_key_agreement_batch,
+    run_key_agreement_batch,
+)
+from src.comms.protocols.runner import build_channel
 from src.schemes.ml_dsa.keygen import ml_dsa_keygen
 from src.schemes.ml_dsa.sign import ml_dsa_sign
 from src.schemes.ml_dsa.verify import ml_dsa_verify
@@ -517,6 +526,114 @@ def _handle_comms_group_key_agreement(args: argparse.Namespace) -> int:
     return 0
 
 
+def _build_group_member_ids(member_count: int, member_prefix: str) -> list[str]:
+    if member_count < 2:
+        raise ValueError("members must be >= 2")
+    return [f"{member_prefix}-{index}" for index in range(1, member_count + 1)]
+
+
+def _build_group_session_from_args(args: argparse.Namespace):
+    group_seed = None
+    if getattr(args, "group_seed_hex", None) is not None:
+        group_seed = _hex_bytes(args.group_seed_hex, "group-seed-hex")
+
+    member_ids = _build_group_member_ids(args.members, args.member_prefix)
+    channel = build_channel(
+        args.channel,
+        noisy_bit_error_rate=args.noisy_bit_error_rate,
+        seed=getattr(args, "seed", None),
+    )
+
+    return perform_group_key_agreement(
+        channel=channel,
+        member_ids=member_ids,
+        params=args.kem_params,
+        coordinator_id=getattr(args, "coordinator_id", "coordinator"),
+        group_seed=group_seed,
+        member_seed_prefix=args.member_seed_prefix,
+    )
+
+
+def _handle_comms_group_export_transcript(args: argparse.Namespace) -> int:
+    session = _build_group_session_from_args(args)
+    document = export_group_transcript(session)
+    return _emit_document(document, args.output)
+
+
+def _handle_comms_group_replay_transcript(args: argparse.Namespace) -> int:
+    document = interoperability.load_document(args.input)
+    replay = replay_group_transcript(document)
+    _print_json(
+        {
+            "command": "comms",
+            "protocol": "group-transcript-replay",
+            "session_id": replay.session_id,
+            "valid": replay.valid,
+            "transcript_hash_hex": replay.transcript_hash_hex,
+            "message_count": replay.message_count,
+        }
+    )
+    return 0
+
+
+def _handle_comms_group_broadcast(args: argparse.Namespace) -> int:
+    session = _build_group_session_from_args(args)
+    message = _text_or_hex_bytes(args.message, args.message_hex, "message")
+    if message is None:
+        raise ValueError("message is required")
+    broadcast = broadcast_group_message(session, message, label=args.label)
+    _print_json(
+        {
+            "command": "comms",
+            "protocol": "group-broadcast",
+            "session_id": broadcast.session_id,
+            "coordinator_id": broadcast.coordinator_id,
+            "label": broadcast.label,
+            "message": broadcast.message,
+            "transcript_hash_hex": broadcast.transcript_hash_hex,
+            "records": [
+                {
+                    "member_id": record.member_id,
+                    "message": record.message,
+                    "tag_hex": record.tag_hex,
+                }
+                for record in broadcast.records
+            ],
+        }
+    )
+    return 0
+
+
+def _handle_comms_group_rekey(args: argparse.Namespace) -> int:
+    session = _build_group_session_from_args(args)
+    rekeyed = rekey_group_membership(
+        session,
+        add_members=list(args.add_member or []),
+        remove_members=list(args.remove_member or []),
+        member_seed_prefix=args.member_seed_prefix,
+    )
+    _print_json(
+        {
+            "command": "comms",
+            "protocol": "group-rekey",
+            "success": rekeyed.success,
+            "previous_session_id": rekeyed.previous_session_id,
+            "new_session_id": rekeyed.new_session_id,
+            "member_ids": rekeyed.member_ids,
+            "member_count": len(rekeyed.member_ids),
+            "coordinator_protocol_state": rekeyed.rekeyed_result.coordinator_state.protocol_state.value,
+            "group_key_consensus": (
+                rekeyed.rekeyed_result.coordinator_group_key is not None
+                and all(
+                    member_key == rekeyed.rekeyed_result.coordinator_group_key
+                    for member_key in rekeyed.rekeyed_result.member_group_keys.values()
+                )
+            ),
+        }
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="libPQC")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -977,6 +1094,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--members", type=int, default=3, help="Number of group members"
     )
     comms_group_key_agreement.add_argument(
+        "--member-prefix", default="member", help="Prefix for generated member IDs"
+    )
+    comms_group_key_agreement.add_argument(
         "--noisy-bit-error-rate",
         type=float,
         default=0.01,
@@ -999,6 +1119,154 @@ def build_parser() -> argparse.ArgumentParser:
         help="Include per-run protocol event logs in JSON output",
     )
     comms_group_key_agreement.set_defaults(handler=_handle_comms_group_key_agreement)
+
+    comms_group_export_transcript = comms_subparsers.add_parser(
+        "group-export-transcript",
+        help="Run a group session and export its transcript document",
+    )
+    comms_group_export_transcript.add_argument(
+        "--channel",
+        default="perfect",
+        choices=["perfect", "noisy", "adversarial"],
+        help="Channel model to simulate",
+    )
+    comms_group_export_transcript.add_argument(
+        "--kem-params", default="ML-KEM-768", help="ML-KEM parameter preset"
+    )
+    comms_group_export_transcript.add_argument(
+        "--members", type=int, default=3, help="Number of group members"
+    )
+    comms_group_export_transcript.add_argument(
+        "--member-prefix", default="member", help="Prefix for generated member IDs"
+    )
+    comms_group_export_transcript.add_argument(
+        "--noisy-bit-error-rate",
+        type=float,
+        default=0.01,
+        help="Bit error rate used by noisy channel",
+    )
+    comms_group_export_transcript.add_argument(
+        "--seed", type=int, help="Optional deterministic seed for channel randomness"
+    )
+    comms_group_export_transcript.add_argument(
+        "--group-seed-hex",
+        help="Optional deterministic 32-byte group seed as hex",
+    )
+    comms_group_export_transcript.add_argument(
+        "--member-seed-prefix",
+        help="Optional deterministic per-member keygen seed prefix",
+    )
+    comms_group_export_transcript.add_argument(
+        "--output", type=Path, help="Optional output file"
+    )
+    comms_group_export_transcript.set_defaults(
+        handler=_handle_comms_group_export_transcript
+    )
+
+    comms_group_replay_transcript = comms_subparsers.add_parser(
+        "group-replay-transcript",
+        help="Replay a previously exported group transcript document",
+    )
+    comms_group_replay_transcript.add_argument(
+        "--input", type=Path, required=True, help="Input transcript document path"
+    )
+    comms_group_replay_transcript.set_defaults(
+        handler=_handle_comms_group_replay_transcript
+    )
+
+    comms_group_broadcast = comms_subparsers.add_parser(
+        "group-broadcast",
+        help="Run a group session and produce authenticated broadcast tags",
+    )
+    comms_group_broadcast.add_argument(
+        "--channel",
+        default="perfect",
+        choices=["perfect", "noisy", "adversarial"],
+        help="Channel model to simulate",
+    )
+    comms_group_broadcast.add_argument(
+        "--kem-params", default="ML-KEM-768", help="ML-KEM parameter preset"
+    )
+    comms_group_broadcast.add_argument(
+        "--members", type=int, default=3, help="Number of group members"
+    )
+    comms_group_broadcast.add_argument(
+        "--member-prefix", default="member", help="Prefix for generated member IDs"
+    )
+    comms_group_broadcast.add_argument(
+        "--noisy-bit-error-rate",
+        type=float,
+        default=0.01,
+        help="Bit error rate used by noisy channel",
+    )
+    comms_group_broadcast.add_argument(
+        "--seed", type=int, help="Optional deterministic seed for channel randomness"
+    )
+    comms_group_broadcast.add_argument(
+        "--group-seed-hex",
+        help="Optional deterministic 32-byte group seed as hex",
+    )
+    comms_group_broadcast.add_argument(
+        "--member-seed-prefix",
+        help="Optional deterministic per-member keygen seed prefix",
+    )
+    msg_group = comms_group_broadcast.add_mutually_exclusive_group(required=True)
+    msg_group.add_argument("--message", help="Broadcast message as UTF-8 text")
+    msg_group.add_argument("--message-hex", help="Broadcast message as hex")
+    comms_group_broadcast.add_argument(
+        "--label", default="broadcast", help="Broadcast label for domain separation"
+    )
+    comms_group_broadcast.set_defaults(handler=_handle_comms_group_broadcast)
+
+    comms_group_rekey = comms_subparsers.add_parser(
+        "group-rekey",
+        help="Run a group session and rekey after membership changes",
+    )
+    comms_group_rekey.add_argument(
+        "--channel",
+        default="perfect",
+        choices=["perfect", "noisy", "adversarial"],
+        help="Channel model to simulate",
+    )
+    comms_group_rekey.add_argument(
+        "--kem-params", default="ML-KEM-768", help="ML-KEM parameter preset"
+    )
+    comms_group_rekey.add_argument(
+        "--members", type=int, default=3, help="Number of group members"
+    )
+    comms_group_rekey.add_argument(
+        "--member-prefix", default="member", help="Prefix for generated member IDs"
+    )
+    comms_group_rekey.add_argument(
+        "--noisy-bit-error-rate",
+        type=float,
+        default=0.01,
+        help="Bit error rate used by noisy channel",
+    )
+    comms_group_rekey.add_argument(
+        "--seed", type=int, help="Optional deterministic seed for channel randomness"
+    )
+    comms_group_rekey.add_argument(
+        "--group-seed-hex",
+        help="Optional deterministic 32-byte group seed as hex",
+    )
+    comms_group_rekey.add_argument(
+        "--member-seed-prefix",
+        help="Optional deterministic per-member keygen seed prefix",
+    )
+    comms_group_rekey.add_argument(
+        "--add-member",
+        action="append",
+        default=[],
+        help="Add a member identifier to the next group session",
+    )
+    comms_group_rekey.add_argument(
+        "--remove-member",
+        action="append",
+        default=[],
+        help="Remove a member identifier from the next group session",
+    )
+    comms_group_rekey.set_defaults(handler=_handle_comms_group_rekey)
 
     return parser
 
