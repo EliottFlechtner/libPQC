@@ -62,6 +62,11 @@ def render_adversary_budget_report(records: Sequence[dict[str, object]]) -> str:
 
 
 def render_tls_handshake_report(record: dict[str, object]) -> str:
+    draft_policy = dict(record.get("draft_policy") or {})
+    policy_status = str(draft_policy.get("status", "unknown"))
+    policy_recommendation = str(
+        draft_policy.get("recommended_draft", record.get("draft", "unknown"))
+    )
     lines = [
         "POST-QUANTUM TLS HANDSHAKE",
         "=" * 80,
@@ -77,10 +82,20 @@ def render_tls_handshake_report(record: dict[str, object]) -> str:
         f"Ciphersuite: {record['ciphersuite']}",
         f"Draft: {record['draft']}",
         f"Compatibility: {'ok' if record['compatibility']['compatible'] else 'failed'}",
+        f"Draft policy: {policy_status}",
+        f"Draft policy enforced: {'yes' if draft_policy.get('enforced') else 'no'}",
+        f"Recommended draft: {policy_recommendation}",
         f"Flight count: {record['flight_count']}",
         f"Transcript hash: {record['transcript_hash_hex']}",
         "Semantic bindings:",
     ]
+    policy_notes = list(draft_policy.get("warnings", [])) + list(
+        draft_policy.get("issues", [])
+    )
+    if policy_notes:
+        lines.append("Draft policy notes:")
+        for note in policy_notes:
+            lines.append(f"- {note}")
     for binding in record["semantic_bindings"]:
         lines.append(f"- {binding}")
     return "\n".join(lines)

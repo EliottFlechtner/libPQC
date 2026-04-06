@@ -173,10 +173,38 @@ class TestTlsAndHybridExperiments(unittest.TestCase):
         self.assertIn("ciphersuite", result)
         self.assertIn("draft", result)
         self.assertIn("compatibility", result)
+        self.assertIn("draft_policy", result)
+        self.assertEqual(result["draft_policy"]["status"], "deprecated")
 
         report = render_tls_handshake_report(result)
         self.assertIn("POST-QUANTUM TLS HANDSHAKE", report)
         self.assertIn("Mode: pq-only", report)
+        self.assertIn("Draft policy:", report)
+
+    def test_tls_draft_policy_enforcement(self):
+        with self.assertRaises(ValueError):
+            simulate_post_quantum_tls_handshake(
+                mode="pq-only",
+                kem_params="ML-KEM-512",
+                dsa_params="ML-DSA-44",
+                runs=1,
+                authenticate_server=True,
+                draft="ietf-pqtls-00",
+                enforce_draft_policy=True,
+            )
+
+        result = simulate_post_quantum_tls_handshake(
+            mode="pq-only",
+            kem_params="ML-KEM-512",
+            dsa_params="ML-DSA-44",
+            runs=1,
+            authenticate_server=True,
+            draft="ietf-pqtls-01",
+            enforce_draft_policy=True,
+        )
+
+        self.assertEqual(result["draft_policy"]["status"], "current")
+        self.assertTrue(result["draft_policy"]["enforced"])
 
     @patch("src.experiments.scenarios.hybrid.simulate_post_quantum_tls_handshake")
     def test_hybrid_scenario_simulation_and_report(self, tls_mock):
@@ -210,6 +238,15 @@ class TestTlsAndHybridExperiments(unittest.TestCase):
             "transcript_hash_hex": "00" * 32,
             "flight_trace": [],
             "semantic_bindings": ["transcript_binding:finished"],
+            "draft_policy": {
+                "known_draft": True,
+                "status": "current",
+                "recommended_draft": "ietf-pqtls-01",
+                "enforced": False,
+                "issues": [],
+                "warnings": [],
+                "summary": "Current PQ TLS draft policy.",
+            },
         }
 
         records = simulate_hybrid_pq_scenarios(

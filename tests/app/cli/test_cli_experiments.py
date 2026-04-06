@@ -127,6 +127,15 @@ class TestCliExperiments(unittest.TestCase):
                 "known_ciphersuite": True,
                 "profile": {},
             },
+            "draft_policy": {
+                "known_draft": True,
+                "status": "current",
+                "recommended_draft": "ietf-pqtls-01",
+                "enforced": True,
+                "issues": [],
+                "warnings": [],
+                "summary": "Current PQ TLS draft policy.",
+            },
         }
         render_report.return_value = "tls-report"
 
@@ -143,10 +152,11 @@ class TestCliExperiments(unittest.TestCase):
                     "--ciphersuite",
                     "TLS13-IETF-PQT-MLKEM768-MLDSA87-SHA384",
                     "--draft",
-                    "ietf-pqtls-00",
+                    "ietf-pqtls-01",
                     "--runs",
                     "1",
                     "--authenticate-server",
+                    "--enforce-draft-policy",
                 ]
             )
 

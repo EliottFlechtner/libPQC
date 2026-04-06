@@ -701,6 +701,7 @@ def _handle_experiment_tls_handshake(args: argparse.Namespace) -> int:
         ciphersuite=args.ciphersuite,
         draft=args.draft,
         enforce_compatibility=not args.skip_compatibility_check,
+        enforce_draft_policy=args.enforce_draft_policy,
     )
     _print_json(
         {
@@ -1490,6 +1491,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-compatibility-check",
         action="store_true",
         help="Allow running even if ciphersuite compatibility checks fail",
+    )
+    experiment_tls.add_argument(
+        "--enforce-draft-policy",
+        action="store_true",
+        help="Treat deprecated TLS drafts as policy violations",
     )
     experiment_tls.set_defaults(handler=_handle_experiment_tls_handshake)
 

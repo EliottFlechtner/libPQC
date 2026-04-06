@@ -21,6 +21,20 @@ DEFAULT_TLS_DRAFT = "ietf-pqtls-00"
 DEFAULT_TLS_CIPHERSUITE = "TLS13-IETF-PQT-MLKEM768-MLDSA87-SHA384"
 
 
+TLS_DRAFT_POLICIES: dict[str, dict[str, object]] = {
+    "ietf-pqtls-00": {
+        "status": "deprecated",
+        "replaced_by": "ietf-pqtls-01",
+        "summary": "Legacy interop draft retained for compatibility checks.",
+    },
+    "ietf-pqtls-01": {
+        "status": "current",
+        "replaced_by": "ietf-pqtls-01",
+        "summary": "Current draft profile with the recommended TLS policy.",
+    },
+}
+
+
 TLS_CIPHERSUITE_PROFILES: dict[str, dict[str, object]] = {
     "TLS13-IETF-PQT-MLKEM512-MLDSA44-SHA256": {
         "kem_params": "ML-KEM-512",
@@ -28,6 +42,10 @@ TLS_CIPHERSUITE_PROFILES: dict[str, dict[str, object]] = {
         "hash": "SHA256",
         "modes": ("pq-only", "hybrid"),
         "drafts": ("ietf-pqtls-00", "ietf-pqtls-01"),
+        "draft_history": {
+            "ietf-pqtls-00": "Initial PQ TLS draft 00 profile for ML-KEM-512 and ML-DSA-44.",
+            "ietf-pqtls-01": "Current PQ TLS draft 01 profile retaining the same parameter binding.",
+        },
     },
     "TLS13-IETF-PQT-MLKEM768-MLDSA87-SHA384": {
         "kem_params": "ML-KEM-768",
@@ -35,6 +53,10 @@ TLS_CIPHERSUITE_PROFILES: dict[str, dict[str, object]] = {
         "hash": "SHA384",
         "modes": ("pq-only", "hybrid"),
         "drafts": ("ietf-pqtls-00", "ietf-pqtls-01"),
+        "draft_history": {
+            "ietf-pqtls-00": "Initial PQ TLS draft 00 profile for ML-KEM-768 and ML-DSA-87.",
+            "ietf-pqtls-01": "Current PQ TLS draft 01 profile retaining the same parameter binding.",
+        },
     },
     "TLS13-IETF-PQT-MLKEM1024-MLDSA87-SHA384": {
         "kem_params": "ML-KEM-1024",
@@ -42,6 +64,9 @@ TLS_CIPHERSUITE_PROFILES: dict[str, dict[str, object]] = {
         "hash": "SHA384",
         "modes": ("pq-only",),
         "drafts": ("ietf-pqtls-01",),
+        "draft_history": {
+            "ietf-pqtls-01": "Draft 01-only profile for ML-KEM-1024 and ML-DSA-87.",
+        },
     },
 }
 
@@ -71,6 +96,7 @@ class TlsHandshakeRecord:
     ciphersuite: str
     draft: str
     compatibility: dict[str, object]
+    draft_policy: dict[str, object]
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -96,7 +122,7 @@ def _check_ciphersuite_compatibility(
     kem_params: str,
     dsa_params: str,
 ) -> dict[str, object]:
-    profile = TLS_CIPHERSUITE_PROFILES.get(ciphersuite)
+    profile = cast(dict[str, object] | None, TLS_CIPHERSUITE_PROFILES.get(ciphersuite))
     issues: list[str] = []
     warnings: list[str] = []
     if profile is None:
@@ -117,9 +143,12 @@ def _check_ciphersuite_compatibility(
         issues.append(
             f"dsa mismatch: expected {profile['dsa_params']}, got {dsa_params}"
         )
-    if mode not in profile["modes"]:
+    modes = cast(tuple[TlsMode, ...], profile["modes"])
+    drafts = cast(tuple[str, ...], profile["drafts"])
+    draft_history = cast(dict[str, str], profile["draft_history"])
+    if mode not in modes:
         issues.append(f"mode {mode} is not allowed for ciphersuite {ciphersuite}")
-    if draft not in profile["drafts"]:
+    if draft not in drafts:
         issues.append(f"draft {draft} not listed for ciphersuite {ciphersuite}")
 
     return {
@@ -131,9 +160,45 @@ def _check_ciphersuite_compatibility(
             "kem_params": profile["kem_params"],
             "dsa_params": profile["dsa_params"],
             "hash": profile["hash"],
-            "modes": list(profile["modes"]),
-            "drafts": list(profile["drafts"]),
+            "modes": list(modes),
+            "drafts": list(drafts),
+            "draft_history": dict(draft_history),
         },
+    }
+
+
+def _check_draft_policy(draft: str, enforce_draft_policy: bool) -> dict[str, object]:
+    policy = TLS_DRAFT_POLICIES.get(draft)
+    if policy is None:
+        return {
+            "known_draft": False,
+            "status": "unknown",
+            "recommended_draft": DEFAULT_TLS_DRAFT,
+            "enforced": enforce_draft_policy,
+            "issues": [f"unsupported TLS draft: {draft}"],
+            "warnings": ["unknown draft policy"],
+            "summary": "Draft policy metadata unavailable.",
+        }
+
+    issues: list[str] = []
+    warnings: list[str] = [str(policy["summary"])]
+    status = str(policy["status"])
+    recommended_draft = str(policy["replaced_by"])
+    if status == "deprecated":
+        warnings.append(f"draft {draft} is deprecated; prefer {recommended_draft}")
+        if enforce_draft_policy:
+            issues.append(
+                f"draft {draft} is deprecated by policy; prefer {recommended_draft}"
+            )
+
+    return {
+        "known_draft": True,
+        "status": status,
+        "recommended_draft": recommended_draft,
+        "enforced": enforce_draft_policy,
+        "issues": issues,
+        "warnings": warnings,
+        "summary": str(policy["summary"]),
     }
 
 
@@ -195,6 +260,7 @@ def simulate_post_quantum_tls_handshake(
     ciphersuite: str | None = None,
     draft: str = DEFAULT_TLS_DRAFT,
     enforce_compatibility: bool = True,
+    enforce_draft_policy: bool = False,
 ) -> dict[str, object]:
     """Simulate a TLS-style handshake using PQ-only or hybrid key schedule."""
 
@@ -214,10 +280,20 @@ def simulate_post_quantum_tls_handshake(
         kem_params,
         dsa_params,
     )
+    draft_policy = _check_draft_policy(draft, enforce_draft_policy)
     if enforce_compatibility and not bool(compatibility["compatible"]):
         raise ValueError(
             "incompatible TLS configuration: "
-            + "; ".join(str(issue) for issue in compatibility["issues"])
+            + "; ".join(
+                str(issue) for issue in cast(list[object], compatibility["issues"])
+            )
+        )
+    if enforce_draft_policy and draft_policy["issues"]:
+        raise ValueError(
+            "incompatible TLS draft policy: "
+            + "; ".join(
+                str(issue) for issue in cast(list[object], draft_policy["issues"])
+            )
         )
 
     durations: list[float] = []
@@ -408,5 +484,6 @@ def simulate_post_quantum_tls_handshake(
         ciphersuite=selected_ciphersuite,
         draft=draft,
         compatibility=compatibility,
+        draft_policy=draft_policy,
     )
     return record.to_dict()
