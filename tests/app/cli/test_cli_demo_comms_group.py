@@ -5,17 +5,7 @@ from io import StringIO
 from src.app import cli
 
 
-class TestCliDemoComms(unittest.TestCase):
-    def test_demo_comms_selection_runs_comms_demo(self):
-        buffer = StringIO()
-        with redirect_stdout(buffer):
-            rc = cli.main(["demo", "comms"])
-
-        output = buffer.getvalue()
-        self.assertEqual(rc, 0)
-        self.assertIn("Comms Secure Key Agreement", output)
-        self.assertNotIn("Comms Group Demo", output)
-
+class TestCliDemoCommsGroup(unittest.TestCase):
     def test_demo_comms_group_selection_runs_group_demo(self):
         buffer = StringIO()
         with redirect_stdout(buffer):
