@@ -50,23 +50,6 @@ def main() -> None:
 
     print("\n" + "=" * 80)
     print("✅ ALL DEMOS COMPLETED")
-    print("=" * 80)
-    print(
-        """
-libPQC is a research-grade implementation of NIST-standardized post-quantum
-cryptography (ML-KEM and ML-DSA) with comprehensive security analysis.
-
-For more information:
-  - docs/ARCHITECTURE.md: Implementation details
-  - docs/SECURITY.md: Formal security analysis
-  - docs/PERFORMANCE.md: Performance characteristics
-  - docs/RESEARCH_NOTES.md: Design decisions and alternatives
-  - tests/conformance/: NIST test vector validation
-  - src/analysis/: Attack cost calculators and security proofs
-
-Portfolio ready for PhD applications in post-quantum cryptography! 🎓
-"""
-    )
 
 
 if __name__ == "__main__":
