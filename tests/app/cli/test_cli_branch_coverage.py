@@ -2,8 +2,9 @@ import json
 import runpy
 import sys
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -12,10 +13,11 @@ from src.app import cli
 
 class TestAppCliCoverage(unittest.TestCase):
     def _capture(self, func, *args, **kwargs):
-        buffer = StringIO()
-        with redirect_stdout(buffer):
+        stdout_buffer = StringIO()
+        stderr_buffer = StringIO()
+        with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
             result = func(*args, **kwargs)
-        return result, buffer.getvalue()
+        return result, stdout_buffer.getvalue()
 
     def test_helpers_and_demo_suite(self):
         self.assertEqual(cli._hex_bytes("00", "x"), b"\x00")
@@ -506,9 +508,11 @@ class TestAppCliCoverage(unittest.TestCase):
             run_demo.assert_called_once_with("all")
 
     def test_cli_module_main_guard(self):
-        with patch.object(sys, "argv", ["cli.py", "--definitely-invalid"]):
+        with patch.object(
+            sys, "argv", ["cli.py", "--definitely-invalid"]
+        ), redirect_stderr(StringIO()):
             with self.assertRaises(SystemExit):
-                runpy.run_module("src.app.cli", run_name="__main__")
+                runpy.run_path(Path(cli.__file__), run_name="__main__")
 
 
 if __name__ == "__main__":
