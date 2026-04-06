@@ -12,6 +12,7 @@ from typing import Callable, Mapping, Sequence
 from demos import (
     attack_cost_comparison_demo,
     comms_demo,
+    comms_group_demo,
     ml_dsa_security_demo,
     ml_kem_security_demo,
     security_analysis_demo,
@@ -45,6 +46,7 @@ DEMO_COMMANDS: dict[str, list[DemoEntry]] = {
         ("ML-KEM Cryptography", run_ml_kem_demo),
         ("ML-DSA Cryptography", run_ml_dsa_demo),
         ("Comms Secure Key Agreement", comms_demo.main),
+        ("Comms Group Session Utilities", comms_group_demo.main),
         ("Lattice Attack Analysis", security_analysis_demo.main),
         ("ML-KEM Security Analysis", ml_kem_security_demo.main),
         ("ML-DSA Security Analysis", ml_dsa_security_demo.main),
@@ -53,6 +55,7 @@ DEMO_COMMANDS: dict[str, list[DemoEntry]] = {
     "ml-kem": [("ML-KEM Cryptography", run_ml_kem_demo)],
     "ml-dsa": [("ML-DSA Cryptography", run_ml_dsa_demo)],
     "comms": [("Comms Secure Key Agreement", comms_demo.main)],
+    "comms-group": [("Comms Group Session Utilities", comms_group_demo.main)],
     "analysis": [("Lattice Attack Analysis", security_analysis_demo.main)],
     "ml-kem-security": [("ML-KEM Security Analysis", ml_kem_security_demo.main)],
     "ml-dsa-security": [("ML-DSA Security Analysis", ml_dsa_security_demo.main)],
