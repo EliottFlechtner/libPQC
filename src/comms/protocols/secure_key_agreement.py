@@ -46,7 +46,9 @@ def _transcript_hash(transcript: List[bytes]) -> bytes:
 
 
 def _derive_handshake_secret(shared_key: bytes, transcript_hash: bytes) -> bytes:
-    return hashlib.sha3_256(b"libpqc|handshake|" + shared_key + transcript_hash).digest()
+    return hashlib.sha3_256(
+        b"libpqc|handshake|" + shared_key + transcript_hash
+    ).digest()
 
 
 def _derive_application_key(handshake_secret: bytes) -> bytes:
@@ -98,7 +100,13 @@ def perform_secure_key_agreement(
 
     transcript: List[bytes] = []
 
-    logger.record("protocol_start", "system", client_state.phase.value, "handshake started", {"session_id": session_id, "channel": channel.name, "params": params})
+    logger.record(
+        "protocol_start",
+        "system",
+        client_state.phase.value,
+        "handshake started",
+        {"session_id": session_id, "channel": channel.name, "params": params},
+    )
 
     try:
         client_hello = {
@@ -119,7 +127,12 @@ def perform_secure_key_agreement(
         transcript.append(_serialize_message(delivered_client_hello))
         client_state.transition(HandshakePhase.CLIENT_HELLO_SENT)
         server_state.transition(HandshakePhase.CLIENT_HELLO_SENT)
-        logger.record("state_transition", client.participant_id, client_state.phase.value, "client hello sent")
+        logger.record(
+            "state_transition",
+            client.participant_id,
+            client_state.phase.value,
+            "client hello sent",
+        )
 
         ek, dk = ml_kem_keygen(params, aseed=server_aseed, zseed=server_zseed)
         server_hello = {
@@ -144,7 +157,12 @@ def perform_secure_key_agreement(
         transcript.append(_serialize_message(delivered_server_hello))
         client_state.transition(HandshakePhase.SERVER_HELLO_SENT)
         server_state.transition(HandshakePhase.SERVER_HELLO_SENT)
-        logger.record("state_transition", server.participant_id, server_state.phase.value, "server hello sent")
+        logger.record(
+            "state_transition",
+            server.participant_id,
+            server_state.phase.value,
+            "server hello sent",
+        )
 
         received_ek_hex = delivered_server_hello.get("encapsulation_key", "")
         if not isinstance(received_ek_hex, str):
@@ -173,7 +191,12 @@ def perform_secure_key_agreement(
         transcript.append(_serialize_message(delivered_client_keyshare))
         client_state.transition(HandshakePhase.CLIENT_KEYSHARE_SENT)
         server_state.transition(HandshakePhase.CLIENT_KEYSHARE_SENT)
-        logger.record("state_transition", client.participant_id, client_state.phase.value, "client keyshare sent")
+        logger.record(
+            "state_transition",
+            client.participant_id,
+            client_state.phase.value,
+            "client keyshare sent",
+        )
 
         delivered_ciphertext_hex = delivered_client_keyshare.get("ciphertext", "")
         if not isinstance(delivered_ciphertext_hex, str):
@@ -208,7 +231,12 @@ def perform_secure_key_agreement(
         )
         transcript.append(_serialize_message(delivered_server_finished))
         server_state.transition(HandshakePhase.SERVER_FINISHED_SENT)
-        logger.record("state_transition", server.participant_id, server_state.phase.value, "server finished sent")
+        logger.record(
+            "state_transition",
+            server.participant_id,
+            server_state.phase.value,
+            "server finished sent",
+        )
 
         client_transcript_hash = _transcript_hash(transcript[:-1])
         client_handshake_secret = _derive_handshake_secret(
@@ -244,7 +272,10 @@ def perform_secure_key_agreement(
             role="client",
             transcript_hash=_transcript_hash(transcript),
         )
-        if delivered_client_finished.get("verify_data") != server_expected_client_verify:
+        if (
+            delivered_client_finished.get("verify_data")
+            != server_expected_client_verify
+        ):
             raise ValueError("client finished verification failed")
 
         transcript.append(_serialize_message(delivered_client_finished))
@@ -256,7 +287,12 @@ def perform_secure_key_agreement(
 
         client_state.transition(HandshakePhase.ESTABLISHED)
         server_state.transition(HandshakePhase.ESTABLISHED)
-        logger.record("state_transition", "system", HandshakePhase.ESTABLISHED.value, "secure session established")
+        logger.record(
+            "state_transition",
+            "system",
+            HandshakePhase.ESTABLISHED.value,
+            "secure session established",
+        )
 
         return HandshakeResult(
             success=True,

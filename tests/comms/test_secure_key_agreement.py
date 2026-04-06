@@ -1,6 +1,10 @@
 import unittest
 
-from src.comms.channels.transports import AdversarialChannel, NoisyChannel, PerfectChannel
+from src.comms.channels.transports import (
+    AdversarialChannel,
+    NoisyChannel,
+    PerfectChannel,
+)
 from src.comms.protocols.secure_key_agreement import perform_secure_key_agreement
 from src.comms.state.session import HandshakePhase
 
@@ -35,7 +39,9 @@ class TestSecureKeyAgreement(unittest.TestCase):
         self.assertEqual(result.server_state.phase, HandshakePhase.FAILED)
 
     def test_secure_key_agreement_fails_on_adversarial_tamper(self):
-        def tamper_keyshare(payload: bytes, sender: str, receiver: str, stage: str) -> bytes:
+        def tamper_keyshare(
+            payload: bytes, sender: str, receiver: str, stage: str
+        ) -> bytes:
             if stage != "client_keyshare":
                 return payload
             mutated = bytearray(payload)
