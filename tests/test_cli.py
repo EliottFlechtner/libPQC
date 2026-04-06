@@ -1,7 +1,9 @@
 import json
 import unittest
+import tempfile
 from contextlib import redirect_stdout
 from io import StringIO
+from pathlib import Path
 from unittest.mock import patch
 
 from src.app import cli
@@ -146,6 +148,38 @@ class TestCli(unittest.TestCase):
         )
         payload = json.loads(output)
         self.assertEqual(payload["operation"], "polynomial-multiplication")
+
+    def test_interop_export_import_ml_kem_keypair(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            export_path = Path(temp_dir) / "ml_kem_keypair.json"
+
+            rc, export_output = self._run_cli(
+                [
+                    "interop",
+                    "export",
+                    "ml-kem",
+                    "keypair",
+                    "--params",
+                    "ML-KEM-768",
+                    "--aseed",
+                    "cli-interop",
+                    "--zseed",
+                    "z" * 32,
+                    "--output",
+                    str(export_path),
+                ]
+            )
+            self.assertEqual(rc, 0)
+            self.assertEqual(export_output, "")
+            self.assertTrue(export_path.exists())
+
+            rc, import_output = self._run_cli(
+                ["interop", "import", "ml-kem", "keypair", "--input", str(export_path)]
+            )
+            self.assertEqual(rc, 0)
+            imported_payload = json.loads(import_output)
+            self.assertEqual(imported_payload["scheme"], "ML-KEM")
+            self.assertEqual(imported_payload["kind"], "keypair")
 
 
 if __name__ == "__main__":
