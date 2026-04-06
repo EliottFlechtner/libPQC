@@ -16,6 +16,7 @@ from demos import (
 )
 from demos.ml_dsa_demo import main as run_ml_dsa_demo
 from demos.ml_kem_demo import main as run_ml_kem_demo
+from src.app import performance
 from src.schemes.ml_dsa.keygen import ml_dsa_keygen
 from src.schemes.ml_dsa.sign import ml_dsa_sign
 from src.schemes.ml_dsa.verify import ml_dsa_verify
@@ -90,6 +91,152 @@ def _run_demo_suite(selection: str) -> int:
 
 def _handle_demo(args: argparse.Namespace) -> int:
     return _run_demo_suite(args.demo_name)
+
+
+def _handle_benchmark(args: argparse.Namespace) -> int:
+    benchmark_handlers = {
+        ("ml-kem", "keygen"): performance.benchmark_ml_kem_keygen,
+        ("ml-kem", "encaps"): performance.benchmark_ml_kem_encaps,
+        ("ml-kem", "decaps"): performance.benchmark_ml_kem_decaps,
+        ("ml-dsa", "keygen"): performance.benchmark_ml_dsa_keygen,
+        ("ml-dsa", "sign"): performance.benchmark_ml_dsa_sign,
+        ("ml-dsa", "verify"): performance.benchmark_ml_dsa_verify,
+        ("core", "poly-mul"): performance.benchmark_polynomial_multiplication,
+    }
+    if args.benchmark_name == "all":
+        _print_json(
+            {
+                "command": "benchmark",
+                "results": performance.benchmark_all(
+                    kem_params=args.kem_params,
+                    dsa_params=args.dsa_params,
+                    iterations=args.iterations,
+                    warmup_iterations=args.warmup,
+                ),
+            }
+        )
+        return 0
+
+    handler = benchmark_handlers[(args.group_name, args.benchmark_name)]
+    if args.group_name == "core":
+        result = handler(
+            modulus=args.modulus,
+            degree=args.degree,
+            iterations=args.iterations,
+            warmup_iterations=args.warmup,
+        )
+    else:
+        result = handler(
+            params=args.kem_params if args.group_name == "ml-kem" else args.dsa_params,
+            iterations=args.iterations,
+            warmup_iterations=args.warmup,
+        )
+    _print_json({"command": "benchmark", **result})
+    return 0
+
+
+def _handle_profile(args: argparse.Namespace) -> int:
+    profile_handlers = {
+        ("ml-kem", "keygen"): performance.profile_ml_kem_keygen,
+        ("ml-kem", "encaps"): performance.profile_ml_kem_encaps,
+        ("ml-kem", "decaps"): performance.profile_ml_kem_decaps,
+        ("ml-dsa", "keygen"): performance.profile_ml_dsa_keygen,
+        ("ml-dsa", "sign"): performance.profile_ml_dsa_sign,
+        ("ml-dsa", "verify"): performance.profile_ml_dsa_verify,
+        ("core", "poly-mul"): performance.profile_polynomial_multiplication,
+    }
+    if args.profile_name == "all":
+        _print_json(
+            {
+                "command": "profile",
+                "results": performance.profile_all(
+                    kem_params=args.kem_params,
+                    dsa_params=args.dsa_params,
+                    iterations=args.iterations,
+                    warmup_iterations=args.warmup,
+                    limit=args.limit,
+                    sort_by=args.sort_by,
+                ),
+            }
+        )
+        return 0
+
+    handler = profile_handlers[(args.group_name, args.profile_name)]
+    if args.group_name == "core":
+        result = handler(
+            modulus=args.modulus,
+            degree=args.degree,
+            iterations=args.iterations,
+            warmup_iterations=args.warmup,
+            limit=args.limit,
+            sort_by=args.sort_by,
+        )
+    else:
+        result = handler(
+            params=args.kem_params if args.group_name == "ml-kem" else args.dsa_params,
+            iterations=args.iterations,
+            warmup_iterations=args.warmup,
+            limit=args.limit,
+            sort_by=args.sort_by,
+        )
+    _print_json({"command": "profile", **result})
+    return 0
+
+
+def _add_benchmark_common_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--kem-params",
+        default=performance.DEFAULT_ML_KEM_PARAMS,
+        help="ML-KEM parameter preset",
+    )
+    parser.add_argument(
+        "--dsa-params",
+        default=performance.DEFAULT_ML_DSA_PARAMS,
+        help="ML-DSA parameter preset",
+    )
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=performance.DEFAULT_ITERATIONS,
+        help="Benchmark iterations",
+    )
+    parser.add_argument(
+        "--warmup",
+        type=int,
+        default=performance.DEFAULT_WARMUP,
+        help="Warmup iterations before timing",
+    )
+
+
+def _add_profile_common_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--kem-params",
+        default=performance.DEFAULT_ML_KEM_PARAMS,
+        help="ML-KEM parameter preset",
+    )
+    parser.add_argument(
+        "--dsa-params",
+        default=performance.DEFAULT_ML_DSA_PARAMS,
+        help="ML-DSA parameter preset",
+    )
+    parser.add_argument(
+        "--iterations", type=int, default=1, help="Iterations to include in the profile"
+    )
+    parser.add_argument(
+        "--warmup", type=int, default=0, help="Warmup iterations before profiling"
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=25,
+        help="Maximum number of functions to print in the profile summary",
+    )
+    parser.add_argument(
+        "--sort-by",
+        default="cumtime",
+        choices=["cumtime", "tottime"],
+        help="Profile sort key",
+    )
 
 
 def _handle_ml_kem_keygen(args: argparse.Namespace) -> int:
@@ -180,13 +327,10 @@ def _handle_ml_dsa_verify(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="libPQC",
-        description="Run libPQC demos or invoke ML-KEM / ML-DSA workflows.",
-    )
-    subparsers = parser.add_subparsers(dest="command")
+    parser = argparse.ArgumentParser(prog="libPQC")
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
-    demo_parser = subparsers.add_parser("demo", help="Run the bundled demos")
+    demo_parser = subparsers.add_parser("demo", help="Run the demo suite")
     demo_parser.add_argument(
         "demo_name",
         nargs="?",
@@ -195,6 +339,120 @@ def build_parser() -> argparse.ArgumentParser:
         help="Which demo to run",
     )
     demo_parser.set_defaults(handler=_handle_demo)
+
+    benchmark_parser = subparsers.add_parser(
+        "benchmark", help="Run deterministic timing benchmarks"
+    )
+    benchmark_subparsers = benchmark_parser.add_subparsers(
+        dest="group_name", required=True
+    )
+
+    benchmark_ml_kem = benchmark_subparsers.add_parser(
+        "ml-kem", help="Benchmark ML-KEM operations"
+    )
+    benchmark_ml_kem_subparsers = benchmark_ml_kem.add_subparsers(
+        dest="benchmark_name", required=True
+    )
+    for name in ["keygen", "encaps", "decaps", "all"]:
+        parser_for_name = benchmark_ml_kem_subparsers.add_parser(name)
+        _add_benchmark_common_args(parser_for_name)
+        parser_for_name.set_defaults(
+            group_name="ml-kem", benchmark_name=name, handler=_handle_benchmark
+        )
+
+    benchmark_ml_dsa = benchmark_subparsers.add_parser(
+        "ml-dsa", help="Benchmark ML-DSA operations"
+    )
+    benchmark_ml_dsa_subparsers = benchmark_ml_dsa.add_subparsers(
+        dest="benchmark_name", required=True
+    )
+    for name in ["keygen", "sign", "verify", "all"]:
+        parser_for_name = benchmark_ml_dsa_subparsers.add_parser(name)
+        _add_benchmark_common_args(parser_for_name)
+        parser_for_name.set_defaults(
+            group_name="ml-dsa", benchmark_name=name, handler=_handle_benchmark
+        )
+
+    benchmark_core = benchmark_subparsers.add_parser(
+        "core", help="Benchmark core arithmetic"
+    )
+    benchmark_core_subparsers = benchmark_core.add_subparsers(
+        dest="benchmark_name", required=True
+    )
+    benchmark_poly = benchmark_core_subparsers.add_parser("poly-mul")
+    _add_benchmark_common_args(benchmark_poly)
+    benchmark_poly.add_argument(
+        "--modulus", type=int, default=3329, help="Coefficient modulus"
+    )
+    benchmark_poly.add_argument(
+        "--degree", type=int, default=256, help="Quotient polynomial degree"
+    )
+    benchmark_poly.set_defaults(
+        group_name="core", benchmark_name="poly-mul", handler=_handle_benchmark
+    )
+
+    benchmark_all = benchmark_subparsers.add_parser(
+        "all", help="Benchmark all supported operations"
+    )
+    _add_benchmark_common_args(benchmark_all)
+    benchmark_all.set_defaults(
+        group_name="all", benchmark_name="all", handler=_handle_benchmark
+    )
+
+    profile_parser = subparsers.add_parser(
+        "profile", help="Run cProfile profiles for supported operations"
+    )
+    profile_subparsers = profile_parser.add_subparsers(dest="group_name", required=True)
+
+    profile_ml_kem = profile_subparsers.add_parser(
+        "ml-kem", help="Profile ML-KEM operations"
+    )
+    profile_ml_kem_subparsers = profile_ml_kem.add_subparsers(
+        dest="profile_name", required=True
+    )
+    for name in ["keygen", "encaps", "decaps", "all"]:
+        parser_for_name = profile_ml_kem_subparsers.add_parser(name)
+        _add_profile_common_args(parser_for_name)
+        parser_for_name.set_defaults(
+            group_name="ml-kem", profile_name=name, handler=_handle_profile
+        )
+
+    profile_ml_dsa = profile_subparsers.add_parser(
+        "ml-dsa", help="Profile ML-DSA operations"
+    )
+    profile_ml_dsa_subparsers = profile_ml_dsa.add_subparsers(
+        dest="profile_name", required=True
+    )
+    for name in ["keygen", "sign", "verify", "all"]:
+        parser_for_name = profile_ml_dsa_subparsers.add_parser(name)
+        _add_profile_common_args(parser_for_name)
+        parser_for_name.set_defaults(
+            group_name="ml-dsa", profile_name=name, handler=_handle_profile
+        )
+
+    profile_core = profile_subparsers.add_parser("core", help="Profile core arithmetic")
+    profile_core_subparsers = profile_core.add_subparsers(
+        dest="profile_name", required=True
+    )
+    profile_poly = profile_core_subparsers.add_parser("poly-mul")
+    _add_profile_common_args(profile_poly)
+    profile_poly.add_argument(
+        "--modulus", type=int, default=3329, help="Coefficient modulus"
+    )
+    profile_poly.add_argument(
+        "--degree", type=int, default=256, help="Quotient polynomial degree"
+    )
+    profile_poly.set_defaults(
+        group_name="core", profile_name="poly-mul", handler=_handle_profile
+    )
+
+    profile_all = profile_subparsers.add_parser(
+        "all", help="Profile all supported operations"
+    )
+    _add_profile_common_args(profile_all)
+    profile_all.set_defaults(
+        group_name="all", profile_name="all", handler=_handle_profile
+    )
 
     ml_kem_parser = subparsers.add_parser("ml-kem", help="ML-KEM command group")
     ml_kem_subparsers = ml_kem_parser.add_subparsers(
