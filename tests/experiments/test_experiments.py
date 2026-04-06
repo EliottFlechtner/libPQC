@@ -164,6 +164,10 @@ class TestTlsAndHybridExperiments(unittest.TestCase):
         self.assertEqual(result["mode"], "pq-only")
         self.assertEqual(result["runs"], 1)
         self.assertIn("estimated_total_bytes", result)
+        self.assertIn("flight_count", result)
+        self.assertIn("transcript_hash_hex", result)
+        self.assertIn("flight_trace", result)
+        self.assertIn("semantic_bindings", result)
 
         report = render_tls_handshake_report(result)
         self.assertIn("POST-QUANTUM TLS HANDSHAKE", report)
@@ -192,6 +196,7 @@ class TestTlsAndHybridExperiments(unittest.TestCase):
 
         records = simulate_hybrid_pq_scenarios(
             modes=("classical-only", "pq-only", "hybrid"),
+            downgrade_variants=("none",),
             iterations=1,
         )
 
@@ -199,6 +204,8 @@ class TestTlsAndHybridExperiments(unittest.TestCase):
         self.assertEqual(records[0]["mode"], "classical-only")
         self.assertEqual(records[1]["mode"], "pq-only")
         self.assertEqual(records[2]["mode"], "hybrid")
+        self.assertEqual(records[2]["downgrade_variant"], "none")
+        self.assertEqual(records[2]["negotiated_mode"], "hybrid")
 
         report = render_hybrid_scenarios_report(records)
         self.assertIn("HYBRID PQ SCENARIO SWEEP", report)

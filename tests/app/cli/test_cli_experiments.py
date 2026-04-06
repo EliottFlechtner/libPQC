@@ -165,6 +165,9 @@ class TestCliExperiments(unittest.TestCase):
                     "--modes",
                     "hybrid",
                     "pq-only",
+                    "--downgrade-variants",
+                    "none",
+                    "strip-pq",
                     "--iterations",
                     "1",
                 ]
@@ -206,6 +209,7 @@ class TestCliExperiments(unittest.TestCase):
                     "1",
                     "--warmup",
                     "0",
+                    "--strict",
                 ]
             )
 
@@ -213,6 +217,43 @@ class TestCliExperiments(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn('"scenario": "performance-regression"', output)
         self.assertIn('"report_markdown": "regression-report"', output)
+
+    @patch("src.app.cli.track_performance_regressions")
+    @patch("src.app.cli.render_performance_regression_report")
+    def test_performance_regression_command_strict_failure(
+        self,
+        render_report,
+        run_regression,
+    ):
+        run_regression.return_value = {
+            "threshold_ratio": 1.15,
+            "baseline_count": 1,
+            "current_count": 1,
+            "comparison_count": 1,
+            "regression_count": 1,
+            "has_regression": True,
+            "deltas": [],
+            "missing_in_current": [],
+            "new_in_current": [],
+            "current_results": [],
+        }
+        render_report.return_value = "regression-report"
+
+        buffer = StringIO()
+        with redirect_stdout(buffer):
+            rc = cli.main(
+                [
+                    "experiment",
+                    "performance-regression",
+                    "--baseline",
+                    "tests/fixtures/baseline.json",
+                    "--strict",
+                ]
+            )
+
+        output = buffer.getvalue()
+        self.assertEqual(rc, 2)
+        self.assertIn('"scenario": "performance-regression"', output)
 
 
 if __name__ == "__main__":
