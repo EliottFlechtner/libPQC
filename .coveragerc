@@ -4,16 +4,12 @@ source =
     src
 omit =
     */__init__.py
-    src/comms/*
-    src/experiments/*
 
 [report]
 show_missing = True
 skip_covered = False
 omit =
     */__init__.py
-    src/comms/*
-    src/experiments/*
 
 [html]
 directory = coverage/html
