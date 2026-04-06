@@ -202,7 +202,10 @@ def run_group_key_agreement_batch(
             result.success
             and result.coordinator_group_key is not None
             and len(member_key_values) == len(member_ids)
-            and all(member_key == result.coordinator_group_key for member_key in member_key_values)
+            and all(
+                member_key == result.coordinator_group_key
+                for member_key in member_key_values
+            )
         )
 
         summaries.append(

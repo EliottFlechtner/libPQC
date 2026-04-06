@@ -38,17 +38,23 @@ def _xor_bytes(left: bytes, right: bytes) -> bytes:
     return bytes(a ^ b for a, b in zip(left, right))
 
 
-def _derive_member_seed(seed_prefix: bytes | str | None, member_id: str) -> bytes | str | None:
+def _derive_member_seed(
+    seed_prefix: bytes | str | None, member_id: str
+) -> bytes | str | None:
     if seed_prefix is None:
         return None
     if isinstance(seed_prefix, bytes):
-        digest = hashlib.sha3_256(seed_prefix + b"|" + member_id.encode("utf-8")).digest()
+        digest = hashlib.sha3_256(
+            seed_prefix + b"|" + member_id.encode("utf-8")
+        ).digest()
         return digest[:32]
     digest = hashlib.sha3_256((seed_prefix + "|" + member_id).encode("utf-8")).digest()
     return digest[:32]
 
 
-def _derive_final_group_key(group_seed: bytes, session_id: str, member_ids: List[str]) -> bytes:
+def _derive_final_group_key(
+    group_seed: bytes, session_id: str, member_ids: List[str]
+) -> bytes:
     payload = (
         b"libpqc|group|"
         + session_id.encode("utf-8")
@@ -126,9 +132,10 @@ def perform_group_key_agreement(
     )
 
     try:
-        group_seed_value = group_seed or hashlib.sha3_256(
-            b"group-seed|" + session_id.encode("utf-8")
-        ).digest()
+        group_seed_value = (
+            group_seed
+            or hashlib.sha3_256(b"group-seed|" + session_id.encode("utf-8")).digest()
+        )
         if len(group_seed_value) != 32:
             raise ValueError("group_seed must be exactly 32 bytes")
 
@@ -163,7 +170,9 @@ def perform_group_key_agreement(
 
             ek_hex = delivered_join.get("encapsulation_key", "")
             if not isinstance(ek_hex, str):
-                raise ValueError(f"join payload missing encapsulation key for {member_id}")
+                raise ValueError(
+                    f"join payload missing encapsulation key for {member_id}"
+                )
 
             coordinator_pairwise_key, ciphertext = ml_kem_encaps(
                 bytes.fromhex(ek_hex),
