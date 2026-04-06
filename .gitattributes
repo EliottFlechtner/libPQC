@@ -1,0 +1,3 @@
+# Treat generated coverage outputs as non-source for language stats
+coverage/** linguist-generated=true
+coverage/*.svg linguist-generated=true
