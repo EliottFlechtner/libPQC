@@ -7,7 +7,7 @@
 
 Lattice-based post-quantum cryptography playground focused on clear, testable implementations of ML-KEM and ML-DSA.
 
-Current status: v0.2.0.
+Current status: v0.2.0 (current consolidated release after v0.1.0).
 
 ## Documentation
 
@@ -16,12 +16,14 @@ Current status: v0.2.0.
 - Architecture: `docs/ARCHITECTURE.md`
 - Security notes: `docs/SECURITY.md`
 - Performance guide: `docs/PERFORMANCE.md`
+- Changelog: `docs/CHANGELOG.md`
 
 ## Release Highlights
 
 - Working ML-KEM flow: key generation, encapsulation, decapsulation
 - Working ML-DSA flow: key generation, signing, verification
 - Full CLI for demos, benchmarks, profiles, and interoperability bundles
+- Integrated analysis demos in the default runner flow
 - Reproducible deterministic demos for both schemes
 - Automated CI, CodeQL, release workflow, and coverage publication
 
@@ -53,16 +55,6 @@ Current status: v0.2.0.
   - Power2Round split (`t1` public, `t0` secret)
   - hint-based signing/verification flow (`MakeHint`/`UseHint` style)
 
-## First Release Scope (v0.1.0)
-
-This first release ships a working, tested, educational implementation of:
-
-- ML-KEM: keygen, encaps, decaps
-- ML-DSA: keygen, sign, verify
-- deterministic seed-driven flows for reproducible tests
-- extensive unit and integration tests
-- CI automation for multi-Python validation and release packaging
-
 ## Current Scope
 
 - `src/schemes/ml_kem` and `src/schemes/ml_dsa` for cryptographic core flows
@@ -73,6 +65,19 @@ This first release ships a working, tested, educational implementation of:
 
 ```text
 src/
+  analysis/
+    cost_calculator.py    # classical/quantum cost helpers
+    lattice_attacks.py    # lattice attack estimators (LLL/BKZ)
+    ml_kem_attacks.py     # ML-KEM attack-surface analysis helpers
+    ml_dsa_attacks.py     # ML-DSA attack-surface analysis helpers
+
+  app/
+    __init__.py           # app package exports
+    __main__.py           # python -m src.app entrypoint
+    cli.py                # command routing and JSON output handlers
+    performance.py        # benchmark/profile orchestration helpers
+    interoperability.py   # export/import bundle conversion helpers
+
   core/
     integers.py           # integer ring arithmetic
     polynomials.py        # polynomial ring operations
@@ -104,11 +109,12 @@ src/
       sign_verify_utils.py # signing/verification utilities
       ml_dsa.py           # canonical high-level exports
 
-  comms/                  # scaffolding
-  experiments/            # scaffolding
-  app/                    # scaffolding
+  comms/                  # reserved communication-layer workspace
+  experiments/            # reserved experiments workspace
 
 tests/
+  analysis/
+    test_*.py             # attack-analysis and cost-model tests
   app/
     cli/
       test_*.py           # CLI command routing and branch-path tests
@@ -117,17 +123,24 @@ tests/
     performance/
       test_*.py           # benchmark/profile helper tests
     test_main_module.py   # module entrypoint behavior
+  conformance/
+    common/               # shared KAT/RSP loaders and helpers
+    ml_kem/               # ML-KEM vector adapters/loaders
+    ml_dsa/               # ML-DSA vector adapters/loaders
+    test_ml_kem_kat.py    # ML-KEM KAT suite
+    test_ml_dsa_kat.py    # ML-DSA KAT suite
+    test_rsp.py           # RSP adapter round-trip tests
+    vectors/              # checked-in ML-KEM/ML-DSA vector corpus
   core/
     test_*.py             # core algebra tests
+  integration/
+    test_*.py             # end-to-end and MLWE integration tests
   schemes/
     ml_kem/
       test_*.py           # ML-KEM tests
     ml_dsa/
       test_*.py           # ML-DSA tests
-  integration/
-    test_*.py             # end-to-end tests
-  conformance/
-    test_*.py             # KAT conformance suites
+  test_analysis.py        # top-level analysis compatibility test module
 ```
 
 ## Quick Start
@@ -138,7 +151,7 @@ tests/
 python3 scratch.py
 ```
 
-This runs both ML-KEM and ML-DSA demos in one command.
+This runs the full demonstration suite (cryptographic flows plus analysis demos) in one command.
 
 ### 2. Run scheme-specific demos
 
@@ -261,7 +274,7 @@ see `tests/conformance/README.md`.
 
 ### Current KAT Status (Verified)
 
-As of 2026-04-02, both conformance suites pass against the currently checked-in
+As of 2026-04-06, both conformance suites pass against the currently checked-in
 vector corpus (`tests/conformance/vectors/ml_kem/*.rsp` and
 `tests/conformance/vectors/ml_dsa/*.rsp`).
 
@@ -310,8 +323,8 @@ For a tag release:
 ```bash
 git checkout main
 git pull --ff-only
-git tag v0.2.0
-git push origin v0.2.0
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 The workflow runs tests and publishes a source tarball in GitHub Releases.
@@ -324,15 +337,9 @@ For release notes, see `docs/CHANGELOG.md`.
 - Messages for current Kyber-PKE helpers are fixed at 32 bytes.
 - The repository favors explicit, testable building blocks over tightly coupled abstractions.
 
-## Near-Term Roadmap
+## Roadmap
 
-Implemented in this release:
-
-- fully working ML-KEM and ML-DSA core flows
-- high coverage and CI automation
-- deterministic demo scripts for quick validation
-
-Next priorities:
+Current focus areas:
 
 - performance profiling and optional optimized paths
 - richer protocol-level examples (key exchange + signed channel skeleton)
