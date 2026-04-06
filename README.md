@@ -7,7 +7,7 @@
 
 Lattice-based post-quantum cryptography playground focused on clear, testable implementations of ML-KEM and ML-DSA.
 
-Current status: v0.1.0 released.
+Current status: v0.2.0.
 
 ## Documentation
 
@@ -21,6 +21,7 @@ Current status: v0.1.0 released.
 
 - Working ML-KEM flow: key generation, encapsulation, decapsulation
 - Working ML-DSA flow: key generation, signing, verification
+- Full CLI for demos, benchmarks, profiles, and interoperability bundles
 - Reproducible deterministic demos for both schemes
 - Automated CI, CodeQL, release workflow, and coverage publication
 
@@ -64,7 +65,9 @@ This first release ships a working, tested, educational implementation of:
 
 ## Current Scope
 
-`src/schemes/ml_kem` and `src/schemes/ml_dsa` are the active focus. Communication and experiment layers are scaffolded and intentionally minimal in v0.1.0.
+- `src/schemes/ml_kem` and `src/schemes/ml_dsa` for cryptographic core flows
+- `src/app` for command-line workflows (demo, benchmark, profile, interop)
+- `tests/conformance` for KAT validation and vector-level compatibility checks
 
 ## Project Layout
 
@@ -106,6 +109,14 @@ src/
   app/                    # scaffolding
 
 tests/
+  app/
+    cli/
+      test_*.py           # CLI command routing and branch-path tests
+    interoperability/
+      test_*.py           # export/import helpers and payload validation tests
+    performance/
+      test_*.py           # benchmark/profile helper tests
+    test_main_module.py   # module entrypoint behavior
   core/
     test_*.py             # core algebra tests
   schemes/
@@ -242,7 +253,7 @@ Useful runtime controls:
 
 CI behavior:
 
-- Pull requests and non-scheduled CI runs execute reduced conformance smoke mode (`LIBPQC_KAT_MAX_RECORDS=2`).
+- Pull requests and non-scheduled CI runs execute the regular non-conformance suite plus reduced conformance smoke mode (`LIBPQC_KAT_MAX_RECORDS=2`).
 - Nightly scheduled CI executes strict full-vector conformance (`LIBPQC_KAT_MAX_RECORDS=1000` + `LIBPQC_KAT_REQUIRE_FULL=1`).
 
 For details on conformance helpers, adapter layers, and suggested folder architecture,
@@ -299,13 +310,13 @@ For a tag release:
 ```bash
 git checkout main
 git pull --ff-only
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 The workflow runs tests and publishes a source tarball in GitHub Releases.
 
-For release notes, see `CHANGELOG.md`.
+For release notes, see `docs/CHANGELOG.md`.
 
 ## Design Notes
 

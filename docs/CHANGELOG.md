@@ -1,6 +1,37 @@
 # Changelog
 
-## v0.1.2 - 2026 (Current)
+## v0.2.0 - 2026-04-06 (Current)
+
+### Added
+
+- **Production CLI workflows** in `src/app/cli.py` and `scratch.py`:
+  - Unified command surface for demos, benchmarks, profiles, and interoperability.
+  - Structured JSON outputs for automated tooling.
+- **Benchmarking and profiling framework** in `src/app/performance.py`:
+  - Deterministic benchmark wrappers for ML-KEM and ML-DSA operations.
+  - cProfile-backed profiling commands with configurable sorting/limits.
+- **Interoperability export/import layer** in `src/app/interoperability.py`:
+  - Canonical JSON bundle format for ML-KEM and ML-DSA keypairs/artifacts.
+  - RSP-compatible packed hex helpers for conformance/toolchain integration.
+  - Test-vector export/import helpers for round-trip validation.
+
+### Changed
+
+- **Test architecture reorganization**:
+  - App-focused suites grouped under `tests/app/` by domain (`cli`, `interoperability`, `performance`).
+  - Expanded branch/error-path coverage for CLI and interoperability code paths.
+- **CI conformance separation**:
+  - Regular suite now runs non-conformance tests only.
+  - Conformance KAT checks run in dedicated smoke/full-vector steps.
+
+### Quality
+
+- End-to-end suite and coverage are fully green for this release cut.
+- Coverage remains at 100% across tracked modules.
+
+---
+
+## v0.1.2 - 2026
 
 ### Added
 
