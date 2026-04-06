@@ -4,7 +4,10 @@ from dataclasses import dataclass
 from typing import Any, Dict, List
 
 from src.comms.channels import AdversarialChannel, NoisyChannel, PerfectChannel
-from src.comms.protocols.secure_key_agreement import HandshakeResult, perform_secure_key_agreement
+from src.comms.protocols.secure_key_agreement import (
+    HandshakeResult,
+    perform_secure_key_agreement,
+)
 
 
 def _default_tamper(payload: bytes, sender: str, receiver: str, stage: str) -> bytes:
