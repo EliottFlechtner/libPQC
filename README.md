@@ -66,81 +66,81 @@ Current status: v0.2.0 (current consolidated release after v0.1.0).
 ```text
 src/
   analysis/
-    cost_calculator.py    # classical/quantum cost helpers
-    lattice_attacks.py    # lattice attack estimators (LLL/BKZ)
-    ml_kem_attacks.py     # ML-KEM attack-surface analysis helpers
-    ml_dsa_attacks.py     # ML-DSA attack-surface analysis helpers
+    cost_calculator.py      # classical/quantum cost helpers
+    lattice_attacks.py      # lattice attack estimators (LLL/BKZ)
+    ml_kem_attacks.py       # ML-KEM attack-surface analysis helpers
+    ml_dsa_attacks.py       # ML-DSA attack-surface analysis helpers
 
   app/
-    __init__.py           # app package exports
-    __main__.py           # python -m src.app entrypoint
-    cli.py                # command routing and JSON output handlers
-    performance.py        # benchmark/profile orchestration helpers
-    interoperability.py   # export/import bundle conversion helpers
+    __init__.py             # app package exports
+    __main__.py             # python -m src.app entrypoint
+    cli.py                  # command routing and JSON output handlers
+    performance.py          # benchmark/profile orchestration helpers
+    interoperability.py     # export/import bundle conversion helpers
 
   core/
-    integers.py           # integer ring arithmetic
-    polynomials.py        # polynomial ring operations
-    module.py             # module arithmetic
-    ntt.py                # number-theoretic transform
-    sampling.py           # sampling utilities (CBD, uniform)
-    serialization.py      # byte serialization helpers
+    integers.py             # integer ring arithmetic
+    polynomials.py          # polynomial ring operations
+    module.py               # module arithmetic
+    ntt.py                  # number-theoretic transform
+    sampling.py             # sampling utilities (CBD, uniform)
+    serialization.py        # byte serialization helpers
 
   schemes/
-    utils.py              # shared utilities (CRH, XOF, PRF)
+    utils.py                # shared utilities (CRH, XOF, PRF)
     ml_kem/
-      kyber_pke.py        # PKE foundation layer
-      pke_utils.py        # PKE helper functions
-      vectors.py          # matrix/vector definitions
-      params.py           # ML-KEM parameter presets
-      kyber_ntt.py        # NTT-based operations for ML-KEM
-      kyber_sampling.py   # ML-KEM-specific sampling
-      keygen.py           # KEM key generation
-      encaps.py           # KEM encapsulation
-      decaps.py           # KEM decapsulation
-      hashes.py           # G/H/J hash and derivation functions
-      ml_kem.py           # canonical high-level exports
+      kyber_pke.py          # PKE foundation layer
+      pke_utils.py          # PKE helper functions
+      vectors.py            # matrix/vector definitions
+      params.py             # ML-KEM parameter presets
+      kyber_ntt.py          # NTT-based operations for ML-KEM
+      kyber_sampling.py     # ML-KEM-specific sampling
+      keygen.py             # KEM key generation
+      encaps.py             # KEM encapsulation
+      decaps.py             # KEM decapsulation
+      hashes.py             # G/H/J hash and derivation functions
+      ml_kem.py             # canonical high-level exports
 
     ml_dsa/
-      params.py           # ML-DSA parameter presets
-      keygen.py           # key generation
-      sign.py             # signing logic
-      verify.py           # verification logic
-      sign_verify_utils.py # signing/verification utilities
-      ml_dsa.py           # canonical high-level exports
+      params.py             # ML-DSA parameter presets
+      keygen.py             # key generation
+      sign.py               # signing logic
+      verify.py             # verification logic
+      sign_verify_utils.py  # signing/verification utilities
+      ml_dsa.py             # canonical high-level exports
 
-  comms/                  # reserved communication-layer workspace
-  experiments/            # reserved experiments workspace
+  comms/                    # reserved communication-layer workspace
+  experiments/              # reserved experiments workspace
 
 tests/
   analysis/
-    test_*.py             # attack-analysis and cost-model tests
+    test_*.py               # attack-analysis and cost-model tests
   app/
     cli/
-      test_*.py           # CLI command routing and branch-path tests
+      test_*.py             # CLI command routing and branch-path tests
     interoperability/
-      test_*.py           # export/import helpers and payload validation tests
+      test_*.py             # export/import helpers and payload validation tests
     performance/
-      test_*.py           # benchmark/profile helper tests
-    test_main_module.py   # module entrypoint behavior
+      test_*.py             # benchmark/profile helper tests
+    test_main_module.py     # module entrypoint behavior
   conformance/
-    common/               # shared KAT/RSP loaders and helpers
-    ml_kem/               # ML-KEM vector adapters/loaders
-    ml_dsa/               # ML-DSA vector adapters/loaders
-    test_ml_kem_kat.py    # ML-KEM KAT suite
-    test_ml_dsa_kat.py    # ML-DSA KAT suite
-    test_rsp.py           # RSP adapter round-trip tests
-    vectors/              # checked-in ML-KEM/ML-DSA vector corpus
+    common/                 # shared KAT/RSP loaders and helpers
+    ml_kem/                 # ML-KEM vector adapters/loaders
+    ml_dsa/                 # ML-DSA vector adapters/loaders
+    test_ml_kem_kat.py      # ML-KEM KAT suite
+    test_ml_dsa_kat.py      # ML-DSA KAT suite
+    test_rsp.py             # RSP adapter round-trip tests
+    vectors/                # checked-in ML-KEM/ML-DSA vector corpus
   core/
-    test_*.py             # core algebra tests
+    test_*.py               # core algebra tests
   integration/
-    test_*.py             # end-to-end and MLWE integration tests
+    test_*.py               # end-to-end and MLWE integration tests
   schemes/
     ml_kem/
-      test_*.py           # ML-KEM tests
+      test_*.py             # ML-KEM tests
     ml_dsa/
-      test_*.py           # ML-DSA tests
-  test_analysis.py        # top-level analysis compatibility test module
+      test_*.py             # ML-DSA tests
+  test_analysis.py          # top-level analysis compatibility test module
 ```
 
 ## Quick Start
