@@ -3,6 +3,7 @@
 [![CI](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EliottFlechtner/libPQC/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EliottFlechtner/libPQC/actions/workflows/codeql.yml)
 [![Release](https://github.com/EliottFlechtner/libPQC/actions/workflows/release.yml/badge.svg)](https://github.com/EliottFlechtner/libPQC/actions/workflows/release.yml)
+[![Experiments Baseline](https://github.com/EliottFlechtner/libPQC/actions/workflows/experiments-baseline.yml/badge.svg?branch=main)](https://github.com/EliottFlechtner/libPQC/actions/workflows/experiments-baseline.yml)
 [![Coverage](coverage/badge.svg)](coverage/summary.md)
 
 Lattice-based post-quantum cryptography playground focused on clear, testable implementations of ML-KEM and ML-DSA.
