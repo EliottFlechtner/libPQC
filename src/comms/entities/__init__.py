@@ -1,1 +1,5 @@
-"""Simulation entities (client, server, adversary) scaffold."""
+"""Simulation entities for communication protocols."""
+
+from .participant import Participant
+
+__all__ = ["Participant"]
