@@ -8,8 +8,8 @@ on:
     branches:
       - main
   workflow_dispatch:
-  schedule:
-    - cron: "43 3 * * *"
+  # schedule:
+  #   - cron: "43 3 * * *"
 
 permissions:
   contents: write

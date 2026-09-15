@@ -8,9 +8,9 @@ on:
     branches:
       - "**"
   pull_request:
-  workflow_dispatch:
-  schedule:
-    - cron: "17 2 * * *"
+  # workflow_dispatch:
+  # schedule:
+  #   - cron: "17 2 * * *"
 
 permissions:
   contents: read
