@@ -232,9 +232,16 @@ jobs:
             echo "No coverage changes to commit"
             exit 0
           fi
-          git pull --rebase origin HEAD
-          git rebase --continue || true
-          git rebase --abort || true
-          git rebase --skip || true
           git commit -m "chore(ci): update coverage report [skip ci]"
-          git push
+
+            for attempt in 1 2 3; do
+              if git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"; then
+                exit 0
+              fi
+
+              git fetch origin "${GITHUB_REF_NAME}"
+              git rebase -X theirs "origin/${GITHUB_REF_NAME}"
+            done
+
+            echo "Failed to push coverage updates after 3 attempts"
+            exit 1
